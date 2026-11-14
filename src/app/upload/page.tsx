@@ -25,12 +25,22 @@ import {
   ShieldCheck,
   Sparkles,
   FileDown,
+  Link2,
+  Globe,
+  Loader2,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function UploadLeadsPage() {
   const [currentUser] = useState<User>(crmStore.getCurrentUser());
   const [batches, setBatches] = useState<LeadImportBatch[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+
+  // Source tab state (Excel/CSV vs Google Sheets)
+  const [uploadMode, setUploadMode] = useState<'file' | 'google_sheet'>('file');
+  const [googleSheetUrl, setGoogleSheetUrl] = useState('');
+  const [isFetchingSheet, setIsFetchingSheet] = useState(false);
+  const [sheetError, setSheetError] = useState<string | null>(null);
 
   // Upload workflow state
   const [file, setFile] = useState<File | null>(null);
@@ -115,6 +125,42 @@ export default function UploadLeadsPage() {
       alert(`Error reading file: ${err.message}`);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleFetchGoogleSheet = async (overrideUrl?: string) => {
+    const urlToFetch = (overrideUrl || googleSheetUrl).trim();
+    if (!urlToFetch) {
+      setSheetError('Please enter a valid Google Sheets URL.');
+      return;
+    }
+
+    setIsFetchingSheet(true);
+    setSheetError(null);
+
+    try {
+      const res = await fetch('/api/leads/fetch-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlToFetch }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to fetch Google Sheet data.');
+      }
+
+      // Convert CSV text to virtual File object
+      const blob = new Blob([data.csvText], { type: 'text/csv' });
+      const virtualFile = new File([blob], `Google_Sheet_${data.sheetId.slice(0, 8)}.csv`, {
+        type: 'text/csv',
+      });
+
+      await handleFileSelected(virtualFile);
+    } catch (err: any) {
+      setSheetError(err.message || 'Error fetching Google Sheet.');
+    } finally {
+      setIsFetchingSheet(false);
     }
   };
 
@@ -323,43 +369,186 @@ export default function UploadLeadsPage() {
 
       {/* Main Upload Box / Flow Cards */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-        {/* Step 1: Drag & Drop */}
+        {/* Step 1: File or Google Sheet Selection */}
         {step === 'drop' && (
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                handleFileSelected(e.dataTransfer.files[0]);
-              }
-            }}
-            onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-2xl p-12 text-center cursor-pointer transition-all hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20 group"
-          >
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  handleFileSelected(e.target.files[0]);
-                }
-              }}
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-            />
-            <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-              <UploadCloud className="w-8 h-8" />
+          <div className="space-y-6">
+            {/* Import Mode Switcher */}
+            <div className="flex items-center justify-center">
+              <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadMode('file');
+                    setSheetError(null);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                    uploadMode === 'file'
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+                  <span>Upload Excel / CSV File</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadMode('google_sheet');
+                    setSheetError(null);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                    uploadMode === 'google_sheet'
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Globe className="w-4 h-4 text-emerald-500" />
+                  <span>Google Sheets Link</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                    Live Sync
+                  </span>
+                </button>
+              </div>
             </div>
-            <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1">
-              Drag & Drop your Lead File here, or browse
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
-              Supported formats: Microsoft Excel (.xlsx, .xls) and CSV (.csv). Up to 50,000 leads per batch.
-            </p>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-600 dark:text-slate-300">
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Expected columns: Customer Name, Mobile Number, Company, Email, Location...</span>
-            </div>
+
+            {/* Mode A: Drag & Drop File */}
+            {uploadMode === 'file' ? (
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFileSelected(e.dataTransfer.files[0]);
+                  }
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-2xl p-12 text-center cursor-pointer transition-all hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20 group"
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleFileSelected(e.target.files[0]);
+                    }
+                  }}
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                />
+                <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                  <UploadCloud className="w-8 h-8" />
+                </div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1">
+                  Drag & Drop your Lead File here, or browse
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-4">
+                  Supported formats: Microsoft Excel (.xlsx, .xls) and CSV (.csv). Up to 50,000 leads per batch.
+                </p>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-600 dark:text-slate-300">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Expected columns: Customer Name, Mobile Number, Company, Email, Location...</span>
+                </div>
+              </div>
+            ) : (
+              /* Mode B: Google Sheets Link Input */
+              <div className="p-8 sm:p-10 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 max-w-2xl mx-auto space-y-6">
+                <div className="text-center space-y-2">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-sm">
+                    <Globe className="w-7 h-7" />
+                  </div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                    Import Leads from Google Sheets
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                    Paste the sharing link to your Google Spreadsheet. We'll automatically fetch all rows, validate phone numbers, and map fields.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Link2 className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <input
+                      type="url"
+                      value={googleSheetUrl}
+                      onChange={(e) => {
+                        setGoogleSheetUrl(e.target.value);
+                        setSheetError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleFetchGoogleSheet();
+                        }
+                      }}
+                      placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFM.../edit?usp=sharing"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    />
+                  </div>
+
+                  {sheetError && (
+                    <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300">
+                      <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Could not fetch Google Sheet</span>
+                        <span className="text-[11px] leading-relaxed">{sheetError}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      disabled={isFetchingSheet}
+                      onClick={() => handleFetchGoogleSheet()}
+                      className="w-full sm:flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-400 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      {isFetchingSheet ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Fetching Google Sheet...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Fetch & Map Leads</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isFetchingSheet}
+                      onClick={() => {
+                        // Pre-populate with our instant sample test Google Sheet URL or trigger quick import
+                        const sampleUrl = 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing';
+                        setGoogleSheetUrl(sampleUrl);
+                        handleFetchGoogleSheet(sampleUrl);
+                      }}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
+                      title="Load sample public test sheet"
+                    >
+                      Try Sample Google Sheet
+                    </button>
+                  </div>
+                </div>
+
+                {/* Instructions Box */}
+                <div className="p-4 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 space-y-1.5">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    How to prepare your Google Sheet:
+                  </span>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] pl-1">
+                    <li>Open your Google Sheet and click the blue <b>Share</b> button in the top right.</li>
+                    <li>Under <i>General access</i>, change from <b>Restricted</b> to <b>Anyone with the link</b> (Viewer).</li>
+                    <li>Click <b>Copy link</b> and paste it above!</li>
+                  </ol>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
