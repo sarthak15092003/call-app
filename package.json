@@ -2,6 +2,7 @@
   "name": "smartcall-crm",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.9.2",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,7 +10,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@next/swc-win32-x64-msvc": "^14.2.15",
     "@supabase/supabase-js": "^2.45.6",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",
