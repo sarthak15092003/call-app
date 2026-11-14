@@ -35,6 +35,47 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const ringTimerRef = useRef<NodeJS.Timeout | null>(null);
   const connectTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autoSimTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSyncTimestampRef = useRef<string>(new Date().toISOString());
+
+  // Real-time Mobile Call Sync Listener
+  // Streams real SIM call completions from the Android Companion APK directly into the live web dashboard
+  useEffect(() => {
+    const pollMobileCalls = async () => {
+      try {
+        const res = await fetch(`/api/telephony/mobile-sync?since=${encodeURIComponent(lastSyncTimestampRef.current)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.events && Array.isArray(data.events) && data.events.length > 0) {
+          lastSyncTimestampRef.current = data.timestamp || new Date().toISOString();
+          
+          for (const ev of data.events) {
+            // Ingest real call into CRM store
+            const result = crmStore.syncMobileCallLog({
+              customerNumber: ev.customerNumber,
+              duration: ev.duration,
+              callType: ev.callType,
+              timestamp: ev.timestamp,
+              agentId: ev.agentId,
+              agentName: ev.agentName,
+            });
+
+            // If connected call, open disposition modal automatically for agent!
+            if (result.lead && ev.duration > 0) {
+              setDispositionCall({
+                lead: result.lead,
+                attempt: result.attempt,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        // Silently continue polling
+      }
+    };
+
+    const interval = setInterval(pollMobileCalls, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Clear timers on unmount
   useEffect(() => {

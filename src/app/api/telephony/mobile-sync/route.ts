@@ -1,10 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+
+// In-memory fallback event queue for immediate real-time sync across devices
+interface SyncedCallRecord {
+  id: string;
+  customerNumber: string;
+  customerName?: string;
+  agentId: string;
+  agentName: string;
+  status: 'connected' | 'no_answer' | 'busy' | 'failed';
+  duration: number;
+  connectedDuration: number;
+  callType: string;
+  timestamp: string;
+  deviceInfo: string;
+  provider: 'mobile_sim';
+  syncedAt: string;
+}
+
+const getGlobalQueue = (): SyncedCallRecord[] => {
+  if (!(globalThis as any)._smartcall_mobile_queue) {
+    (globalThis as any)._smartcall_mobile_queue = [];
+  }
+  return (globalThis as any)._smartcall_mobile_queue;
+};
 
 /**
  * Mobile Call Tracker API Endpoint
  * 
- * Used by the Android Companion App (SmartCall Agent APK) to upload real call logs
- * captured by Android TelephonyManager and CallLog content provider.
+ * Ingests real carrier SIM calls from the SmartCall Agent Android APK.
+ * Broadcasts the live call event to all connected CRM web dashboards.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -27,11 +52,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Determine status from duration & callType
     const durationSec = parseInt(duration || 0, 10);
     const isConnected = durationSec > 0;
     
-    let callStatus = 'failed';
+    let callStatus: 'connected' | 'no_answer' | 'busy' | 'failed' = 'failed';
     if (isConnected) {
       callStatus = 'connected';
     } else if (callType === 'MISSED') {
@@ -42,7 +66,7 @@ export async function POST(req: NextRequest) {
       callStatus = 'failed';
     }
 
-    const callRecord = {
+    const callRecord: SyncedCallRecord = {
       id: `call_mob_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       customerNumber,
       agentId: agentId || 'usr_agent_1',
@@ -57,11 +81,36 @@ export async function POST(req: NextRequest) {
       syncedAt: new Date().toISOString()
     };
 
-    console.log('[Mobile Sync API] Ingested real call event from device:', callRecord);
+    console.log('[Mobile Sync API] Ingested real carrier call event:', callRecord);
+
+    // Save to server-side buffer
+    const queue = getGlobalQueue();
+    queue.unshift(callRecord);
+    if (queue.length > 200) queue.pop();
+
+    // If Supabase PostgreSQL is connected, persist permanently
+    if (supabase) {
+      try {
+        await supabase.from('call_attempts').insert({
+          id: callRecord.id,
+          lead_phone: callRecord.customerNumber,
+          agent_id: callRecord.agentId,
+          agent_name: callRecord.agentName,
+          status: callRecord.status,
+          duration: callRecord.duration,
+          connected_duration: callRecord.connectedDuration,
+          provider: 'mobile_sim',
+          provider_call_id: callRecord.id,
+          start_time: callRecord.timestamp,
+        });
+      } catch (dbErr) {
+        console.warn('[Mobile Sync] Supabase write skipped or pending config:', dbErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Mobile call log recorded successfully',
+      message: 'Mobile call log recorded and dispatched to CRM dashboard',
       data: callRecord,
       actionRequired: isConnected ? 'DISPOSITION_REQUIRED' : 'LOG_RECORDED'
     });
@@ -74,12 +123,24 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/**
+ * GET Endpoint: Polled by web dashboard to stream incoming mobile calls
+ */
 export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const since = searchParams.get('since');
+  const queue = getGlobalQueue();
+
+  let events = queue;
+  if (since) {
+    const sinceTime = new Date(since).getTime();
+    events = queue.filter((item) => new Date(item.syncedAt).getTime() > sinceTime);
+  }
+
   return NextResponse.json({
     status: 'online',
-    endpoint: '/api/telephony/mobile-sync',
-    supportedMethods: ['POST'],
-    instructions: 'Send POST with { customerNumber, duration, callType, timestamp, agentId } to sync real Android call logs.'
+    count: events.length,
+    events: events.slice(0, 50),
+    timestamp: new Date().toISOString()
   });
 }
-
