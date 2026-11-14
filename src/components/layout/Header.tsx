@@ -110,7 +110,21 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
         </button>
 
-        {/* Reset Demo Data Button */}
+        {/* Clean Live Data / Reset Toggle */}
+        <button
+          type="button"
+          onClick={() => {
+            if (confirm('Clear all demo data and start with a 100% clean production database? You can then upload your own Excel files and track real calls.')) {
+              crmStore.clearAllDemoData();
+            }
+          }}
+          className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/60 dark:bg-rose-950/20 text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors"
+          title="Clear all demo leads and start fresh with 100% clean live database"
+        >
+          <RotateCcw className="w-3 h-3" />
+          <span>Clear Dummy Data</span>
+        </button>
+
         <button
           type="button"
           onClick={() => {
@@ -118,13 +132,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               crmStore.resetToDemoData();
             }
           }}
-          className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] font-medium text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+          className="hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
           title="Restore fresh sample dataset"
         >
-          <RotateCcw className="w-3 h-3" />
-          <span>Reset Demo</span>
+          <span>Demo Data</span>
         </button>
       </div>
     </header>
   );
 };
+

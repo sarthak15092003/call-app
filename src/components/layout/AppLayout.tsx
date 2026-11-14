@@ -34,3 +34,4 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
     </ThemeProvider>
   );
 };
+

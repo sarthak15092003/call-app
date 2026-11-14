@@ -40,3 +40,4 @@ export interface TelephonyProviderAdapter {
   verifyWebhookSignature(headers: Headers | Record<string, string | string[] | undefined>, rawBody: string, secret: string): boolean;
   parseWebhook(body: any, headers?: any): TelephonyWebhookPayload;
 }
+

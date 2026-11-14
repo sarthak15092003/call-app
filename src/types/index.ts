@@ -85,7 +85,7 @@ export interface CallAttempt {
   agent_id: string;
   agent_name: string;
   agent_number: string;
-  provider: 'exotel' | 'myoperator' | 'demo';
+  provider: 'exotel' | 'myoperator' | 'demo' | 'mobile_sim';
   provider_call_id: string;
   status: CallStatus;
   start_time: string;
@@ -178,7 +178,7 @@ export interface DailyReport {
 }
 
 export interface IntegrationSettings {
-  telephony_provider: 'exotel' | 'myoperator' | 'demo';
+  telephony_provider: 'exotel' | 'myoperator' | 'demo' | 'mobile_sim';
   exotel_account_sid: string;
   exotel_api_key: string;
   exotel_api_token: string;
@@ -207,3 +207,4 @@ export interface AuditLog {
   ip_address: string;
   created_at: string;
 }
+

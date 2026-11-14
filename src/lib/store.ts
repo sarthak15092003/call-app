@@ -1041,6 +1041,101 @@ class CRMStore {
     this.setItem(STORAGE_KEYS.AUDIT_LOGS, [newLog, ...logs.slice(0, 99)]);
   }
 
+  // Clean Data & Mobile Tracker Methods
+  clearAllDemoData(): void {
+    if (!this.isBrowser()) return;
+    this.saveLeads([]);
+    this.saveBatches([]);
+    this.saveCallAttempts([]);
+    this.saveFollowUps([]);
+    this.saveReports([]);
+    this.logAudit({
+      action: 'DATA_CLEARED',
+      entity_type: 'system',
+      entity_id: 'clean_state',
+      details: 'All demo leads, calls, batches and follow-ups were cleared. System is now running on 100% clean live data.',
+    });
+    window.location.reload();
+  }
+
+  isDemoModeActive(): boolean {
+    const leads = this.getLeads();
+    // If leads are empty or all leads have is_demo !== true
+    return leads.some((l) => l.id.startsWith('lead_'));
+  }
+
+  // Handle call logs synced from Android Mobile App
+  syncMobileCallLog(log: {
+    customerNumber: string;
+    duration: number; // in seconds
+    callType: 'OUTGOING' | 'INCOMING' | 'MISSED' | 'REJECTED';
+    timestamp: string;
+    agentId?: string;
+    agentName?: string;
+    notes?: string;
+  }): { lead?: Lead; attempt: CallAttempt } {
+    const leads = this.getLeads();
+    const cleanCustomerNum = log.customerNumber.replace(/\D/g, '');
+    
+    // Find lead by exact phone or last 10 digits
+    const lead = leads.find((l) => {
+      const cleanLeadNum = l.phone.replace(/\D/g, '');
+      return cleanLeadNum === cleanCustomerNum || 
+             (cleanCustomerNum.length >= 10 && cleanLeadNum.endsWith(cleanCustomerNum.slice(-10)));
+    });
+
+    const isConnected = log.duration > 0;
+    const callStatus: CallStatus = isConnected 
+      ? 'connected' 
+      : (log.callType === 'MISSED' ? 'no_answer' : (log.callType === 'REJECTED' ? 'busy' : 'failed'));
+
+    const agent = log.agentId 
+      ? this.getUsers().find((u) => u.id === log.agentId) || this.getCurrentUser()
+      : this.getCurrentUser();
+
+    // Create CallAttempt record
+    const attempt: CallAttempt = {
+      id: `call_mob_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      lead_id: lead ? lead.id : 'unknown',
+      customer_name: lead ? lead.name : `Customer (${log.customerNumber})`,
+      customer_number: log.customerNumber,
+      agent_id: agent.id,
+      agent_name: agent.name,
+      agent_number: agent.phone,
+      provider: 'mobile_sim',
+      provider_call_id: `mob_${Date.now()}`,
+      status: callStatus,
+      start_time: log.timestamp || new Date().toISOString(),
+      end_time: new Date(new Date(log.timestamp || Date.now()).getTime() + log.duration * 1000).toISOString(),
+      ringing_duration: 0,
+      connected_duration: log.duration,
+      is_demo: false,
+      created_at: new Date().toISOString(),
+    };
+
+    this.saveCallAttempts([attempt, ...this.getCallAttempts()]);
+
+    // If lead matched, update counters
+    let updatedLead: Lead | undefined;
+    if (lead) {
+      updatedLead = this.updateLead(lead.id, {
+        call_attempts_count: lead.call_attempts_count + 1,
+        total_connected_duration: lead.total_connected_duration + log.duration,
+        last_call_at: attempt.start_time,
+        last_call_status: attempt.status,
+      });
+    }
+
+    this.logAudit({
+      action: 'MOBILE_CALL_SYNCED',
+      entity_type: 'call',
+      entity_id: attempt.id,
+      details: `Mobile SIM call synced for ${log.customerNumber}. Duration: ${log.duration}s, Status: ${callStatus}, Agent: ${agent.name}`,
+    });
+
+    return { lead: updatedLead, attempt };
+  }
+
   resetToDemoData(): void {
     if (!this.isBrowser()) return;
     localStorage.removeItem(STORAGE_KEYS.LEADS);
@@ -1056,3 +1151,4 @@ class CRMStore {
 }
 
 export const crmStore = new CRMStore();
+

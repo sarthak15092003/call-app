@@ -233,3 +233,4 @@ CREATE POLICY agent_call_attempts ON call_attempts FOR ALL TO authenticated
     agent_id = auth.uid() OR
     EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role = 'admin')
   );
+

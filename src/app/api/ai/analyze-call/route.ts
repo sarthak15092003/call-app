@@ -67,3 +67,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'AI analysis failed' }, { status: 500 });
   }
 }
+

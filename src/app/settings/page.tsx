@@ -6,6 +6,7 @@ import { IntegrationSettings, AuditLog } from '@/types';
 import {
   Settings,
   Phone,
+  PhoneCall,
   Radio,
   Key,
   Shield,
@@ -112,8 +113,9 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
+              { id: 'mobile_sim', label: 'Android Mobile Tracker (APK)', desc: 'Track real outbound SIM calls and actual duration from your Android phone via native APK.' },
               { id: 'demo', label: 'Demo Telephony Simulator', desc: 'Zero credentials required. High-fidelity call simulation with ringing & timers.' },
               { id: 'exotel', label: 'Exotel Telephony Gateway', desc: 'Direct outbound click-to-call API with call recording and Indian virtual numbers.' },
               { id: 'myoperator', label: 'MyOperator Cloud Call', desc: 'Enterprise PBX dialer with live agent tracking and webhook callbacks.' },
@@ -149,6 +151,78 @@ export default function SettingsPage() {
               );
             })}
           </div>
+
+          {/* Android Mobile APK Tracker Card */}
+          {settings.telephony_provider === 'mobile_sim' && (
+            <div className="p-5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-indigo-200 dark:border-indigo-900/50 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <PhoneCall className="w-4 h-4 text-indigo-500" />
+                    Android Companion App (SmartCall Agent APK)
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Real GSM/VoLTE calls made from your mobile phone are tracked with exact talk duration via Android CallLog.
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  Real SIM Call Tracking
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-2 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <span className="font-bold text-slate-800 dark:text-slate-200">How Real Mobile Tracking Works:</span>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-600 dark:text-slate-400 text-[11px]">
+                    <li>Install the <b>SmartCall Agent APK</b> on your Android phone.</li>
+                    <li>Grant <b>READ_CALL_LOG</b> and <b>READ_PHONE_STATE</b> permissions.</li>
+                    <li>Enter your CRM URL (e.g. <code>https://your-app.vercel.app</code>).</li>
+                    <li>When you tap Call, your phone dials the customer over your normal SIM.</li>
+                    <li>When you hang up, the app queries the native Android CallLog, gets the exact duration (e.g. 48s), and posts it to the CRM server automatically!</li>
+                  </ol>
+                </div>
+
+                <div className="space-y-2 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <span className="font-bold text-slate-800 dark:text-slate-200">Mobile Sync Ingestion API:</span>
+                  <div className="font-mono text-[11px] p-2 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 break-all">
+                    {typeof window !== 'undefined' ? `${window.location.origin}/api/telephony/mobile-sync` : '/api/telephony/mobile-sync'}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/telephony/mobile-sync', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            agentId: 'usr_agent_1',
+                            agentName: 'Mobile Agent',
+                            customerNumber: '+919820154321',
+                            duration: 52,
+                            callType: 'OUTGOING',
+                            timestamp: new Date().toISOString()
+                          })
+                        });
+                        const data = await res.json();
+                        crmStore.syncMobileCallLog({
+                          customerNumber: '+919820154321',
+                          duration: 52,
+                          callType: 'OUTGOING',
+                          timestamp: new Date().toISOString()
+                        });
+                        alert('Simulated Mobile SIM Sync Success! Duration: 52 seconds recorded on Ananya Deshmukh.');
+                      } catch (err: any) {
+                        alert('Error: ' + err.message);
+                      }
+                    }}
+                    className="w-full px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs transition-colors"
+                  >
+                    Test Ingest Real Call Event Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Exotel Fields */}
           {settings.telephony_provider === 'exotel' && (
@@ -401,6 +475,71 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Vercel Cloud Deployment Card */}
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white shadow-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-700/60 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-black flex items-center justify-center border border-slate-700">
+                <svg className="w-4 h-4 fill-white" viewBox="0 0 1155 1000">
+                  <path d="M577.346 0L1154.69 1000H0L577.346 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-white">
+                  Deploy to Vercel in 1 Click
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Host your CRM backend & frontend online so your mobile APK can sync calls anywhere in real-time
+                </p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+              Vercel Ready
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-indigo-300 font-bold">
+                <span className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px]">1</span>
+                Push to GitHub
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Commit repository to your GitHub account:
+              </p>
+              <pre className="p-2 bg-black/60 rounded text-[10px] font-mono text-emerald-400 overflow-x-auto">
+                git remote add origin &lt;repo-url&gt;{'\n'}git push -u origin main
+              </pre>
+            </div>
+
+            <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-indigo-300 font-bold">
+                <span className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px]">2</span>
+                Deploy with Vercel CLI
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Or deploy instantly from terminal in 1 command:
+              </p>
+              <pre className="p-2 bg-black/60 rounded text-[10px] font-mono text-emerald-400 overflow-x-auto">
+                npx vercel --prod
+              </pre>
+            </div>
+
+            <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-indigo-300 font-bold">
+                <span className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px]">3</span>
+                Connect Mobile APK
+              </div>
+              <p className="text-[11px] text-slate-300">
+                Open SmartCall Agent APK on Android, enter your live Vercel domain:
+              </p>
+              <pre className="p-2 bg-black/60 rounded text-[10px] font-mono text-amber-300 overflow-x-auto">
+                https://your-crm.vercel.app
+              </pre>
+            </div>
+          </div>
+        </div>
+
         {/* Save Button */}
         <div className="flex items-center justify-end">
           <button
@@ -465,3 +604,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

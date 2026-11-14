@@ -203,3 +203,4 @@ export async function generateDailyReportExcel(report: DailyReport, callHistory:
   const buffer = await workbook.xlsx.writeBuffer();
   return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
+
