@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     if (supabase) {
       try {
         await supabase.from('call_attempts').insert({
-          id: callRecord.id,
+          customer_number: callRecord.customerNumber,
           lead_phone: callRecord.customerNumber,
           agent_id: callRecord.agentId,
           agent_name: callRecord.agentName,
@@ -131,16 +131,52 @@ export async function GET(req: NextRequest) {
   const since = searchParams.get('since');
   const queue = getGlobalQueue();
 
-  let events = queue;
-  if (since) {
-    const sinceTime = new Date(since).getTime();
-    events = queue.filter((item) => new Date(item.syncedAt).getTime() > sinceTime);
+  let dbEvents: any[] = [];
+  if (supabase) {
+    try {
+      let query = supabase
+        .from('call_attempts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (since) {
+        query = query.gt('created_at', since);
+      }
+
+      const { data } = await query;
+      if (data && Array.isArray(data)) {
+        dbEvents = data.map((d) => ({
+          id: d.id,
+          customerNumber: d.customer_number || d.lead_phone,
+          agentId: d.agent_id || 'usr_agent_1',
+          agentName: d.agent_name || 'Mobile Agent',
+          status: d.status,
+          duration: d.duration || d.connected_duration || 0,
+          connectedDuration: d.connected_duration || 0,
+          callType: 'OUTGOING',
+          timestamp: d.start_time || d.created_at,
+          syncedAt: d.created_at,
+          provider: 'mobile_sim',
+        }));
+      }
+    } catch (err) {
+      console.warn('[Mobile Sync GET] Supabase query fallback:', err);
+    }
+  }
+
+  // Combine DB events with in-memory queue
+  const merged = [...dbEvents];
+  for (const q of queue) {
+    if (!merged.some((m) => m.customerNumber === q.customerNumber)) {
+      merged.push(q);
+    }
   }
 
   return NextResponse.json({
     status: 'online',
-    count: events.length,
-    events: events.slice(0, 50),
-    timestamp: new Date().toISOString()
+    count: merged.length,
+    events: merged.slice(0, 50),
+    timestamp: new Date().toISOString(),
   });
 }
