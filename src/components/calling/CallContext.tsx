@@ -40,6 +40,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Real-time Mobile Call Sync Listener
   // Streams real SIM call completions from the Android Companion APK directly into the live web dashboard
   useEffect(() => {
+    // Initial sync of leads from Supabase cloud database
+    crmStore.syncFromSupabase();
+
     const pollMobileCalls = async () => {
       try {
         const res = await fetch(`/api/telephony/mobile-sync?since=${encodeURIComponent(lastSyncTimestampRef.current)}`);

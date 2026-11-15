@@ -1,5 +1,6 @@
 'use client';
 
+import { supabase } from '@/lib/supabase';
 import {
   User,
   Lead,
@@ -776,6 +777,43 @@ class CRMStore {
     const batches = this.getBatches();
     this.saveBatches([batch, ...batches]);
 
+    // Async sync to live Supabase PostgreSQL database
+    const client = supabase;
+    if (client) {
+      const dbLeads = newLeads.map((l) => ({
+        batch_id: batch.id,
+        name: l.name,
+        phone: l.phone,
+        raw_phone: l.raw_phone,
+        company: l.company || '',
+        email: l.email || '',
+        location: l.location || '',
+        lead_source: l.lead_source || 'Import',
+        remarks: l.remarks || '',
+        interest_status: l.interest_status || 'Undecided',
+        call_attempts_count: l.call_attempts_count || 0,
+        total_connected_duration: l.total_connected_duration || 0,
+      }));
+
+      (async () => {
+        try {
+          await client.from('lead_import_batches').upsert({
+            id: batch.id,
+            file_name: batch.file_name,
+            file_size: batch.file_size,
+            total_rows: batch.total_rows,
+            imported_count: batch.imported_count,
+            invalid_count: batch.invalid_count,
+            duplicate_count: batch.duplicate_count,
+            status: batch.status,
+          });
+          await client.from('leads').insert(dbLeads);
+        } catch (err) {
+          console.warn('[Supabase Lead Sync Warning]', err);
+        }
+      })();
+    }
+
     // Audit log
     this.logAudit({
       action: 'LEAD_IMPORT',
@@ -783,6 +821,49 @@ class CRMStore {
       entity_id: batch.id,
       details: `Imported ${batch.imported_count} leads from ${batch.file_name}. Duplicate: ${batch.duplicate_count}, Invalid: ${batch.invalid_count}.`,
     });
+  }
+
+  async syncFromSupabase(): Promise<void> {
+    const client = supabase;
+    if (!this.isBrowser() || !client) return;
+    try {
+      const { data: dbLeads, error } = await client.from('leads').select('*').order('created_at', { ascending: false });
+      if (error || !dbLeads || dbLeads.length === 0) return;
+
+      const local = this.getLeads();
+      const localMap = new Map(local.map((l) => [l.phone, l]));
+
+      const merged: Lead[] = dbLeads.map((d: any) => {
+        const loc = localMap.get(d.phone);
+        return {
+          id: d.id,
+          batch_id: d.batch_id || 'supabase',
+          name: d.name,
+          phone: d.phone,
+          raw_phone: d.raw_phone || d.phone,
+          company: d.company || '',
+          email: d.email || '',
+          location: d.location || '',
+          lead_source: d.lead_source || 'Import',
+          assigned_agent_id: d.assigned_agent_id || '',
+          assigned_agent_name: 'Assigned',
+          remarks: d.remarks || '',
+          interest_status: (loc?.interest_status && loc.interest_status !== 'Undecided') ? loc.interest_status : (d.interest_status || 'Undecided'),
+          call_attempts_count: Math.max(d.call_attempts_count || 0, loc?.call_attempts_count || 0),
+          total_connected_duration: Math.max(d.total_connected_duration || 0, loc?.total_connected_duration || 0),
+          last_call_at: d.last_call_at || loc?.last_call_at || null,
+          last_call_status: d.last_call_status || loc?.last_call_status || 'never_called',
+          next_followup_at: d.next_followup_at || loc?.next_followup_at || null,
+          is_dnc: Boolean(d.is_dnc),
+          created_at: d.created_at,
+          updated_at: d.updated_at || d.created_at,
+        };
+      });
+
+      this.saveLeads(merged);
+    } catch (err) {
+      console.warn('Sync from Supabase failed:', err);
+    }
   }
 
   // Batches
