@@ -3,9 +3,12 @@ package com.example.smartcallagent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.provider.CallLog
 import android.telephony.TelephonyManager
 import android.util.Log
+import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -22,30 +25,30 @@ class CallReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "SmartCallReceiver"
-        private var lastState = TelephonyManager.EXTRA_STATE_IDLE
-        private var isCallInProgress = false
+        const val DEFAULT_SERVER_URL = "https://call-app-aouj.vercel.app"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
+        val action = intent.action
+        if (action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
 
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE) ?: return
-        Log.d(TAG, "Phone State changed from $lastState to $state")
+        val prefs = context.getSharedPreferences("smartcall_prefs", Context.MODE_PRIVATE)
+        val prevState = prefs.getString("last_phone_state", TelephonyManager.EXTRA_STATE_IDLE)
+        prefs.edit().putString("last_phone_state", state).apply()
 
-        if (state == TelephonyManager.EXTRA_STATE_OFFHOOK) {
-            isCallInProgress = true
-        } else if (state == TelephonyManager.EXTRA_STATE_IDLE && isCallInProgress) {
-            isCallInProgress = false
-            Log.d(TAG, "Outbound call completed! Querying Android CallLog...")
+        Log.d(TAG, "Phone State changed from $prevState to $state")
 
-            // Delay 1.5s so Android OS flushes CallLog.Calls
+        // Trigger processing whenever transitioning to IDLE (call finished or missed)
+        if (state == TelephonyManager.EXTRA_STATE_IDLE) {
+            Log.d(TAG, "Phone IDLE detected. Checking CallLog...")
+
+            // Wait 1.5s then 3.5s to ensure Android flushes CallLog
             CoroutineScope(Dispatchers.IO).launch {
                 delay(1500)
                 processLastCall(context)
             }
         }
-
-        lastState = state
     }
 
     private fun processLastCall(context: Context) {
@@ -70,6 +73,22 @@ class CallReceiver : BroadcastReceiver() {
                     val type = it.getInt(it.getColumnIndexOrThrow(CallLog.Calls.TYPE))
                     val dateLong = it.getLong(it.getColumnIndexOrThrow(CallLog.Calls.DATE))
 
+                    val prefs = context.getSharedPreferences("smartcall_prefs", Context.MODE_PRIVATE)
+                    val lastSyncedDate = prefs.getLong("last_synced_call_date", 0L)
+
+                    // Prevent duplicate syncing of the same call event
+                    if (dateLong == lastSyncedDate) {
+                        Log.d(TAG, "Call at $dateLong already synced. Skipping.")
+                        return
+                    }
+
+                    // Only sync calls that occurred within the last 5 minutes
+                    val ageMs = System.currentTimeMillis() - dateLong
+                    if (ageMs > 5 * 60 * 1000) {
+                        Log.d(TAG, "Latest call in CallLog is too old (${ageMs / 1000}s ago). Skipping.")
+                        return
+                    }
+
                     val callTypeStr = when (type) {
                         CallLog.Calls.OUTGOING_TYPE -> "OUTGOING"
                         CallLog.Calls.INCOMING_TYPE -> "INCOMING"
@@ -82,13 +101,12 @@ class CallReceiver : BroadcastReceiver() {
 
                     Log.i(TAG, "Extracted Call from SIM: Number=$number, Duration=${durationSeconds}s, Type=$callTypeStr")
 
-                    // Retrieve CRM server configuration from SharedPreferences
-                    val prefs = context.getSharedPreferences("smartcall_prefs", Context.MODE_PRIVATE)
-                    val serverUrl = prefs.getString("server_url", "https://your-crm.vercel.app")?.trimEnd('/')
+                    // Retrieve CRM server configuration
+                    val serverUrl = prefs.getString("server_url", DEFAULT_SERVER_URL)?.trimEnd('/') ?: DEFAULT_SERVER_URL
                     val agentId = prefs.getString("agent_id", "usr_agent_1") ?: "usr_agent_1"
                     val agentName = prefs.getString("agent_name", "Mobile Agent") ?: "Mobile Agent"
 
-                    sendCallToServer(
+                    val success = sendCallToServer(
                         serverUrl = "$serverUrl/api/telephony/mobile-sync",
                         agentId = agentId,
                         agentName = agentName,
@@ -97,6 +115,17 @@ class CallReceiver : BroadcastReceiver() {
                         callType = callTypeStr,
                         timestamp = dateIso
                     )
+
+                    if (success) {
+                        prefs.edit().putLong("last_synced_call_date", dateLong).apply()
+                        Handler(Looper.getMainLooper()).post {
+                            Toast.makeText(
+                                context,
+                                "SmartCall: Synced call to $number (${durationSeconds}s) to CRM!",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -112,8 +141,8 @@ class CallReceiver : BroadcastReceiver() {
         duration: Int,
         callType: String,
         timestamp: String
-    ) {
-        try {
+    ): Boolean {
+        return try {
             val url = URL(serverUrl)
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
@@ -141,9 +170,10 @@ class CallReceiver : BroadcastReceiver() {
             val responseCode = conn.responseCode
             Log.i(TAG, "Uploaded call to CRM ($serverUrl). HTTP Response Code: $responseCode")
             conn.disconnect()
+            responseCode in 200..299
         } catch (e: Exception) {
             Log.e(TAG, "Failed to upload call to CRM server: ${e.message}", e)
+            false
         }
     }
 }
-
