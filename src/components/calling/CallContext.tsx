@@ -43,6 +43,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Initial sync of leads from Supabase cloud database
     crmStore.syncFromSupabase();
 
+    const handleFocus = () => {
+      crmStore.syncFromSupabase();
+    };
+    window.addEventListener('focus', handleFocus);
+
     const pollMobileCalls = async () => {
       try {
         const res = await fetch(`/api/telephony/mobile-sync?since=${encodeURIComponent(lastSyncTimestampRef.current)}`);
@@ -77,7 +82,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const interval = setInterval(pollMobileCalls, 2000);
-    return () => clearInterval(interval);
+    const dbSyncInterval = setInterval(() => {
+      crmStore.syncFromSupabase();
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(dbSyncInterval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Clear timers on unmount

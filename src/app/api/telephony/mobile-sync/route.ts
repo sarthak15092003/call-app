@@ -91,7 +91,36 @@ export async function POST(req: NextRequest) {
     // If Supabase PostgreSQL is connected, persist permanently
     if (supabase) {
       try {
+        let leadId: string | null = null;
+        const cleanNumber = callRecord.customerNumber.replace(/\D/g, '').slice(-10);
+
+        // Try to find matching lead in Supabase
+        const { data: matchedLeads } = await supabase.from('leads').select('*').limit(200);
+        if (matchedLeads && matchedLeads.length > 0) {
+          const match = matchedLeads.find((l: any) => {
+            const lPhone = (l.phone || '').replace(/\D/g, '');
+            const lRaw = (l.raw_phone || '').replace(/\D/g, '');
+            return lPhone.endsWith(cleanNumber) || lRaw.endsWith(cleanNumber);
+          });
+
+          if (match) {
+            leadId = match.id;
+            callRecord.customerName = match.name;
+
+            // Increment call stats directly on the lead record in Supabase
+            await supabase.from('leads').update({
+              call_attempts_count: (match.call_attempts_count || 0) + 1,
+              total_connected_duration: (match.total_connected_duration || 0) + callRecord.connectedDuration,
+              last_call_at: callRecord.timestamp,
+              last_call_status: callRecord.status,
+              updated_at: new Date().toISOString(),
+            }).eq('id', match.id);
+          }
+        }
+
+        // Insert permanent call attempt log into Supabase
         await supabase.from('call_attempts').insert({
+          lead_id: leadId,
           customer_number: callRecord.customerNumber,
           lead_phone: callRecord.customerNumber,
           agent_id: callRecord.agentId,
