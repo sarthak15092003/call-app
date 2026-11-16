@@ -326,7 +326,23 @@ class CRMStore {
   // Call Attempts
   getCallAttempts(): CallAttempt[] {
     const raw = this.getItem(STORAGE_KEYS.CALL_ATTEMPTS, INITIAL_CALL_ATTEMPTS);
-    return raw.filter((a) => !a.id?.startsWith('call_att_0'));
+    const nonMock = raw.filter((a) => !a.id?.startsWith('call_att_0'));
+    
+    // Deduplicate calls strictly by provider_call_id or phone + timestamp window
+    const seen = new Set<string>();
+    const deduplicated: CallAttempt[] = [];
+    for (const a of nonMock) {
+      const cleanPhone = (a.customer_number || '').replace(/\D/g, '').slice(-10);
+      const timeSec = Math.round(new Date(a.start_time).getTime() / 15000); // 15s window
+      const key = a.provider_call_id?.startsWith('call_sheet_')
+        ? a.provider_call_id
+        : `${cleanPhone}_${timeSec}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduplicated.push(a);
+      }
+    }
+    return deduplicated;
   }
 
   saveCallAttempts(attempts: CallAttempt[]): void {

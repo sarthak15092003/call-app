@@ -18,18 +18,31 @@ import {
   Users,
   Shield,
   Layers,
+  Search,
+  Filter,
+  PhoneCall,
+  Table,
 } from 'lucide-react';
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
+  const [callAttempts, setCallAttempts] = useState<CallAttempt[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
 
+  // Search & Filter for Consolidated Excel Ledger
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeView, setActiveView] = useState<'excel_ledger' | 'daily_summary'>('excel_ledger');
+
   const loadData = () => {
+    const attempts = crmStore.getCallAttempts();
+    setCallAttempts(attempts);
+
     let list = crmStore.getReports();
-    if (list.length === 0 && crmStore.getCallAttempts().length > 0) {
+    if (list.length === 0 && attempts.length > 0) {
       const today = new Date().toISOString().split('T')[0];
       const todayReport = crmStore.generateDailyReport(today);
       list = [todayReport];
@@ -80,6 +93,30 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadConsolidatedCSV = () => {
+    if (callAttempts.length === 0) return;
+    const headers = ['Row #', 'Date & Time', 'Customer Name', 'Phone Number', 'Duration (s)', 'Status', 'Agent Name', 'Call ID'];
+    const rows = filteredAttempts.map((a, idx) => [
+      idx + 1,
+      `"${new Date(a.start_time).toLocaleString()}"`,
+      `"${(a.customer_name || 'Customer').replace(/"/g, '""')}"`,
+      `"${a.customer_number}"`,
+      a.connected_duration || 0,
+      `"${a.status}"`,
+      `"${a.agent_name || "sarthak's F16"}"`,
+      `"${a.id}"`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SmartCall_Consolidated_Call_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleSendNowEmail = async () => {
     if (!selectedReport) return;
     setIsSendingEmail(true);
@@ -112,60 +149,282 @@ export default function ReportsPage() {
     }
   };
 
+  // Filtered Calls for Consolidated Excel Table
+  const filteredAttempts = callAttempts.filter((a) => {
+    if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchName = (a.customer_name || '').toLowerCase().includes(q);
+      const matchPhone = (a.customer_number || '').includes(q);
+      const matchAgent = (a.agent_name || '').toLowerCase().includes(q);
+      if (!matchName && !matchPhone && !matchAgent) return false;
+    }
+    return true;
+  });
+
+  const totalFilteredCalls = filteredAttempts.length;
+  const connectedFilteredCalls = filteredAttempts.filter((a) => a.status === 'connected');
+  const totalFilteredDuration = connectedFilteredCalls.reduce((s, c) => s + (c.connected_duration || 0), 0);
+  const avgFilteredDuration = connectedFilteredCalls.length > 0 ? Math.round(totalFilteredDuration / connectedFilteredCalls.length) : 0;
+  const connectRate = totalFilteredCalls > 0 ? Math.round((connectedFilteredCalls.length / totalFilteredCalls) * 100) : 0;
+
+  const formatDurationStr = (sec: number) => {
+    if (!sec || sec <= 0) return '0s';
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    if (m === 0) return `${s}s`;
+    if (s === 0) return `${m}m`;
+    return `${m}m ${s}s`;
+  };
+
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
+    <div className="space-y-6 pb-12">
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Automated Evening Performance Reporting
-            </h2>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Call Performance & Reports</h1>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Automated 6:00 PM IST daily call ledger, agent performance summaries, PDF exports & executive email dispatches
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Real carrier calls, live duration tracking, consolidated Excel ledger & PDF executive exports
           </p>
         </div>
 
-        {/* Generate / Send Now Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* View Toggle Tabs */}
+        <div className="flex items-center gap-2">
+          <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setActiveView('excel_ledger')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeView === 'excel_ledger'
+                  ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Consolidated Excel View</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView('daily_summary')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeView === 'daily_summary'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Executive Daily Summary</span>
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={handleGenerateToday}
             disabled={isGenerating}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-sm transition-colors"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm transition-colors"
           >
-            <Clock className="w-3.5 h-3.5 text-indigo-500" />
-            <span>{isGenerating ? 'Generating...' : 'Compile Today\'s Report'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSendNowEmail}
-            disabled={isSendingEmail || !selectedReport}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>{isSendingEmail ? 'Dispatching...' : 'Send Now (Email)'}</span>
+            <Clock className="w-4 h-4 text-indigo-500" />
+            <span>{isGenerating ? 'Compiling...' : 'Refresh Today'}</span>
           </button>
         </div>
       </div>
 
-      {emailSuccessMsg && (
-        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span>{emailSuccessMsg}</span>
+      {/* VIEW 1: CONSOLIDATED EXCEL SPREADSHEET VIEW */}
+      {activeView === 'excel_ledger' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+          {/* Spreadsheet Header Toolbar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  Live Call Ledger (Excel Grid)
+                </span>
+                <span className="text-xs text-slate-500 font-mono">
+                  {totalFilteredCalls} records synced
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Real time-synced carrier calls from Google Sheet with verified seconds duration
+              </p>
+            </div>
+
+            {/* Quick KPI Formulas / Summary Banner */}
+            <div className="flex items-center flex-wrap gap-2">
+              <div className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-1.5">
+                <span className="text-slate-400">Total Calls:</span>
+                <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{totalFilteredCalls}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-1.5">
+                <span className="text-slate-400">Connected:</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{connectedFilteredCalls.length}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-1.5">
+                <span className="text-slate-400">Total Duration:</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-white">{formatDurationStr(totalFilteredDuration)}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs flex items-center gap-1.5">
+                <span className="text-slate-400">Avg Duration:</span>
+                <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{avgFilteredDuration}s</span>
+              </div>
+
+              {/* Export Buttons */}
+              <button
+                type="button"
+                onClick={handleDownloadConsolidatedCSV}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-colors"
+                title="Export full consolidated records as CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export CSV</span>
+              </button>
+            </div>
           </div>
-          <button onClick={() => setEmailSuccessMsg(null)}>
-            <CheckCircle2 className="w-4 h-4" />
-          </button>
+
+          {/* Search & Status Filters */}
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative flex-1 w-full">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by customer name, phone number or agent..."
+                className="w-full pl-9 pr-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none"
+              >
+                <option value="all">All Statuses ({callAttempts.length})</option>
+                <option value="connected">Connected Only</option>
+                <option value="no_answer">No Answer / Missed</option>
+                <option value="busy">Busy</option>
+                <option value="failed">Failed / Cancelled</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Excel Spreadsheet Table */}
+          <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th className="px-3.5 py-3 w-12 text-center bg-slate-200/60 dark:bg-slate-800/80">#</th>
+                  <th className="px-4 py-3">Timestamp (IST)</th>
+                  <th className="px-4 py-3">Customer Name</th>
+                  <th className="px-4 py-3">Phone Number</th>
+                  <th className="px-4 py-3">Duration</th>
+                  <th className="px-4 py-3">Call Status</th>
+                  <th className="px-4 py-3">Agent</th>
+                  <th className="px-4 py-3">Provider</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-sans">
+                {filteredAttempts.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400 font-sans">
+                      No calls matching current filters. Real calls will appear here automatically as synced from Google Sheet.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAttempts.map((call, idx) => {
+                    const isConnected = call.status === 'connected';
+                    return (
+                      <tr
+                        key={call.id || idx}
+                        className={`hover:bg-emerald-50/30 dark:hover:bg-slate-800/40 transition-colors ${
+                          idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-850/30'
+                        }`}
+                      >
+                        <td className="px-3.5 py-3 text-center font-mono text-slate-400 bg-slate-50/80 dark:bg-slate-800/40 font-semibold text-[11px]">
+                          {idx + 1}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-600 dark:text-slate-300 text-[11px]">
+                          {new Date(call.start_time).toLocaleString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: true,
+                          })}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
+                          {call.customer_name || 'Customer'}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 font-semibold">
+                          {call.customer_number}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatDurationStr(call.connected_duration || 0)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              isConnected
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                : call.status === 'no_answer'
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                            {call.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
+                          {call.agent_name || "sarthak's F16"}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-[11px] text-slate-400 uppercase">
+                          {call.provider || 'mobile_sim'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+
+              {/* Excel Summary Total Row (Formula Bar Style) */}
+              {filteredAttempts.length > 0 && (
+                <tfoot className="bg-slate-100 dark:bg-slate-800/80 font-mono font-bold border-t-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
+                  <tr>
+                    <td className="px-3.5 py-3 text-center text-slate-500 font-bold uppercase text-[11px]">TOTAL</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400 text-xs font-sans">
+                      {totalFilteredCalls} Calls Logged
+                    </td>
+                    <td className="px-4 py-3 text-indigo-600 font-sans">
+                      {new Set(filteredAttempts.map((a) => a.customer_number)).size} Unique Contacts
+                    </td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">--</td>
+                    <td className="px-4 py-3 text-emerald-600 dark:text-emerald-400 font-mono text-sm">
+                      {formatDurationStr(totalFilteredDuration)}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-sans text-emerald-600">
+                      {connectRate}% Connected
+                    </td>
+                    <td className="px-4 py-3 text-xs font-sans text-slate-500">
+                      sarthak's F16
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-400">--</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
         </div>
       )}
 
-      {/* Main Report View Card */}
-      {selectedReport && (
+      {/* VIEW 2: DAILY SUMMARY CARD */}
+      {activeView === 'daily_summary' && selectedReport && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
           {/* Header of Report Card */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
@@ -180,7 +439,7 @@ export default function ReportsPage() {
                 Report Date: {selectedReport.report_date}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Generated at {new Date(selectedReport.generated_at).toLocaleString()} • Dispatched to {selectedReport.email_recipients.join(', ')}
+                Generated at {new Date(selectedReport.generated_at).toLocaleString()} • Dispatched to {selectedReport.email_recipients.join(', ') || 'sarthak@smartcall.com'}
               </p>
             </div>
 
@@ -334,7 +593,10 @@ export default function ReportsPage() {
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
-                      onClick={() => setSelectedReport(rep)}
+                      onClick={() => {
+                        setSelectedReport(rep);
+                        setActiveView('daily_summary');
+                      }}
                       className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-700 dark:text-slate-300 hover:text-indigo-600 transition-colors"
                     >
                       View Report
@@ -349,4 +611,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
