@@ -22,7 +22,22 @@ import {
   Filter,
   PhoneCall,
   Table,
+  Plus,
+  Tag,
 } from 'lucide-react';
+
+const DEFAULT_DISPOSITIONS = [
+  'Interested',
+  'Follow-up Required',
+  'Callback Requested',
+  'Converted',
+  'Not Interested',
+  'Wrong Number',
+  'Do Not Contact',
+  'Hot Lead',
+  'Price Negotiation',
+  'Meeting Scheduled',
+];
 
 export default function ReportsPage() {
   const [reports, setReports] = useState<DailyReport[]>([]);
@@ -36,6 +51,65 @@ export default function ReportsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activeView, setActiveView] = useState<'excel_ledger' | 'daily_summary'>('excel_ledger');
+
+  // Custom Items / Dispositions state
+  const [dispositionOptions, setDispositionOptions] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smartcall_disposition_options');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return DEFAULT_DISPOSITIONS;
+  });
+  const [updatingRowId, setUpdatingRowId] = useState<string | null>(null);
+
+  const handleAddCustomOption = () => {
+    const newItem = prompt('Enter new disposition / call status item (e.g. VIP Client, Pricing Issue, Demo Booked):');
+    if (newItem && newItem.trim()) {
+      const trimmed = newItem.trim();
+      if (!dispositionOptions.includes(trimmed)) {
+        const updated = [...dispositionOptions, trimmed];
+        setDispositionOptions(updated);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('smartcall_disposition_options', JSON.stringify(updated));
+        }
+      }
+    }
+  };
+
+  const handleUpdateDisposition = async (call: CallAttempt, newDisp: string) => {
+    if (newDisp === '__ADD_NEW__') {
+      handleAddCustomOption();
+      return;
+    }
+
+    setUpdatingRowId(call.id);
+
+    // 1. Update in local store
+    try {
+      crmStore.updateCallAttempt(call.id, { disposition: newDisp });
+      setCallAttempts(crmStore.getCallAttempts());
+
+      // 2. Sync to Google Sheet via API
+      await fetch('/api/telephony/update-disposition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: call.customer_number,
+          sheetRow: call.sheet_row,
+          disposition: newDisp,
+          callId: call.id,
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to update disposition:', err);
+    } finally {
+      setUpdatingRowId(null);
+    }
+  };
 
   const loadData = async () => {
     // 1. Fetch latest sheet calls directly so UI never shows empty if localStorage was cleared
@@ -338,7 +412,7 @@ export default function ReportsPage() {
                   <th className="px-4 py-3">Duration</th>
                   <th className="px-4 py-3">Call Status</th>
                   <th className="px-4 py-3">Agent</th>
-                  <th className="px-4 py-3">Provider</th>
+                  <th className="px-4 py-3">Disposition / Tag</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-sans">
@@ -398,8 +472,36 @@ export default function ReportsPage() {
                         <td className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300">
                           {call.agent_name || "sarthak's F16"}
                         </td>
-                        <td className="px-4 py-3 font-mono text-[11px] text-slate-400 uppercase">
-                          {call.provider || 'mobile_sim'}
+                        <td className="px-4 py-2">
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={call.disposition || ''}
+                              disabled={updatingRowId === call.id}
+                              onChange={(e) => handleUpdateDisposition(call, e.target.value)}
+                              className={`text-xs font-semibold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none ${
+                                call.disposition === 'Interested' || call.disposition === 'Converted' || call.disposition === 'Hot Lead'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                                  : call.disposition === 'Follow-up Required' || call.disposition === 'Callback Requested'
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800'
+                                  : call.disposition === 'Not Interested' || call.disposition === 'Do Not Contact'
+                                  ? 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+                                  : call.disposition
+                                  ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                              }`}
+                            >
+                              <option value="">Select Disposition / Tag...</option>
+                              {dispositionOptions.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                              <option value="__ADD_NEW__">+ Add Custom Tag...</option>
+                            </select>
+                            {updatingRowId === call.id && (
+                              <span className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

@@ -123,7 +123,8 @@ export async function GET(req: NextRequest) {
 
     const syncedCalls: any[] = [];
 
-    for (const row of rows) {
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      const row = rows[rowIndex];
       const rawPhone = String(row['Phone Number'] || row.phone || row.number || '').trim();
       const cleanPhone = rawPhone.replace(/\D/g, '');
       if (cleanPhone.length < 5) continue;
@@ -162,6 +163,16 @@ export async function GET(req: NextRequest) {
       const timestampMs = Date.parse(timestamp) || Date.now();
       const agentId = 'usr_' + agentName.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
+      // Check for Disposition / Status column (Column G, or key 'Disposition'/'Status')
+      const disposition = String(
+        row['Disposition'] ||
+        row['disposition'] ||
+        row['Status'] ||
+        row['Tags'] ||
+        row['Tag'] ||
+        ''
+      ).trim();
+
       const callRecord = {
         id: `call_sheet_${timestampMs}_${cleanPhone.slice(-4)}`,
         customerNumber: phoneNormalized,
@@ -173,6 +184,8 @@ export async function GET(req: NextRequest) {
         connectedDuration: duration,
         callType,
         timestamp,
+        disposition: disposition || undefined,
+        sheetRow: rowIndex + 2, // 1-based index (Header is row 1, data starts row 2)
         provider: 'mobile_sim',
         syncedAt: new Date().toISOString(),
       };

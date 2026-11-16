@@ -96,6 +96,8 @@ export interface CallAttempt {
   connected_duration: number; // seconds
   recording_url?: string;
   is_demo: boolean;
+  disposition?: string;
+  sheet_row?: number;
   created_at: string;
   // Optional AI analysis fields
   transcript?: string;

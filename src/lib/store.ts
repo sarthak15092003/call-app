@@ -768,6 +768,8 @@ class CRMStore {
         end_time: isoTime,
         ringing_duration: 0,
         connected_duration: sc.duration || 0,
+        disposition: sc.disposition || undefined,
+        sheet_row: sc.sheetRow || (idx + 2),
         is_demo: false,
         created_at: isoTime,
       };
