@@ -29,8 +29,53 @@ export async function GET(req: NextRequest) {
     }
 
     const json = await response.json();
-    const rows: any[] = json.data || [];
+    const rawRows: any[] = json.data || [];
 
+    // ── Merge duplicate pairs (START row + END row) into one call ─────────────
+    // Pattern: two consecutive rows with same phone within 10 min, both duration=0
+    // The START row has "Unknown" name; END row has real name + agent
+    const mergedRows: any[] = [];
+    for (let i = 0; i < rawRows.length; i++) {
+      const row = rawRows[i];
+      const phone1 = String(row['Phone Number'] || row.phone || '').replace(/\D/g, '').slice(-10);
+      const dur1   = Number(row['Duration (Seconds)'] || row.duration || 0);
+      const type1  = String(row['Call Type'] || '').toUpperCase();
+
+      // If this row has duration=0 or is IN_PROGRESS, try to find its END pair
+      if ((dur1 === 0 || type1 === 'IN_PROGRESS') && i + 1 < rawRows.length) {
+        const next   = rawRows[i + 1];
+        const phone2 = String(next['Phone Number'] || next.phone || '').replace(/\D/g, '').slice(-10);
+        const dur2   = Number(next['Duration (Seconds)'] || next.duration || 0);
+
+        if (phone1 && phone1 === phone2) {
+          // Parse timestamps to calculate real duration
+          const t1 = new Date(row['Timestamp']  || row.timestamp  || 0).getTime();
+          const t2 = new Date(next['Timestamp'] || next.timestamp || 0).getTime();
+          const diffSec = t1 && t2 && t2 > t1 ? Math.round((t2 - t1) / 1000) : Math.max(dur1, dur2);
+
+          // Prefer END row's caller name (it has the real contact name)
+          const bestName = (String(next['Caller Name'] || next.callerName || '') !== 'Unknown' &&
+                            String(next['Caller Name'] || next.callerName || '') !== '')
+                           ? (next['Caller Name'] || next.callerName)
+                           : (row['Caller Name']  || row.callerName);
+
+          mergedRows.push({
+            'Timestamp':        row['Timestamp'] || row.timestamp,   // use START time
+            'Caller Name':      bestName,
+            'Phone Number':     row['Phone Number'] || row.phone,
+            'Duration (Seconds)': diffSec,                           // calculated ✅
+            'Call Type':        'OUTGOING',
+            'Agent Name':       next['Agent Name'] || next.agentName || row['Agent Name'] || row.agentName,
+          });
+          i++; // skip the END row (already consumed)
+          continue;
+        }
+      }
+
+      mergedRows.push(row); // non-duplicate row, pass through as-is
+    }
+
+    const rows = mergedRows;
     const syncedCalls: any[] = [];
 
     for (const row of rows) {
@@ -38,7 +83,16 @@ export async function GET(req: NextRequest) {
       if (!rawPhone) continue;
 
       const phoneNormalized = rawPhone.startsWith('+') ? rawPhone : (rawPhone.length === 10 ? `+91${rawPhone}` : `+${rawPhone}`);
-      const duration = parseInt(row['Duration (Seconds)'] || row.duration || 0, 10);
+      const rawDur = String(row['Duration (Seconds)'] || row.duration || '0');
+      // Handle "1m 23s", "45s", plain number
+      let duration = 0;
+      const minMatch = rawDur.match(/(\d+)m/);
+      const secMatch = rawDur.match(/(\d+)s/);
+      if (minMatch || secMatch) {
+        duration = (minMatch ? parseInt(minMatch[1]) * 60 : 0) + (secMatch ? parseInt(secMatch[1]) : 0);
+      } else {
+        duration = parseInt(rawDur, 10) || 0;
+      }
       const callerName = row['Caller Name'] || row.callerName || row.name || 'Caller';
       const callType = (row['Call Type'] || row.callType || 'OUTGOING').toUpperCase();
       const timestamp = row['Timestamp'] || row.timestamp || new Date().toISOString();
