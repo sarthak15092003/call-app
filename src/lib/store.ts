@@ -750,6 +750,9 @@ class CRMStore {
       const agentName = String(sc.agentName || '').trim() || 'Agent';
       const agentId = sc.agentId || ('usr_' + agentName.toLowerCase().replace(/[^a-z0-9]/g, '_'));
 
+      const parsedDate = new Date(sc.timestamp);
+      const isoTime = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : sc.timestamp;
+
       return {
         id: sc.id || `call_sheet_${Date.parse(sc.timestamp) || Date.now()}_${idx}`,
         lead_id: `lead_${(sc.customerNumber || '').replace(/\D/g, '').slice(-10)}`,
@@ -761,12 +764,12 @@ class CRMStore {
         provider: 'mobile_sim',
         provider_call_id: sc.id || `sheet_${idx}`,
         status: callStatus,
-        start_time: sc.timestamp,
-        end_time: sc.timestamp,
+        start_time: isoTime,
+        end_time: isoTime,
         ringing_duration: 0,
         connected_duration: sc.duration || 0,
         is_demo: false,
-        created_at: sc.timestamp,
+        created_at: isoTime,
       };
     });
 
