@@ -50,28 +50,46 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const pollMobileCalls = async () => {
       try {
+        // 1. Poll Mobile Sync API
         const res = await fetch(`/api/telephony/mobile-sync?since=${encodeURIComponent(lastSyncTimestampRef.current)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.events && Array.isArray(data.events) && data.events.length > 0) {
-          lastSyncTimestampRef.current = data.timestamp || new Date().toISOString();
-          
-          for (const ev of data.events) {
-            // Ingest real call into CRM store
-            const result = crmStore.syncMobileCallLog({
-              customerNumber: ev.customerNumber,
-              duration: ev.duration,
-              callType: ev.callType,
-              timestamp: ev.timestamp,
-              agentId: ev.agentId,
-              agentName: ev.agentName,
-            });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.events && Array.isArray(data.events) && data.events.length > 0) {
+            lastSyncTimestampRef.current = data.timestamp || new Date().toISOString();
+            
+            for (const ev of data.events) {
+              const result = crmStore.syncMobileCallLog({
+                customerNumber: ev.customerNumber,
+                duration: ev.duration,
+                callType: ev.callType,
+                timestamp: ev.timestamp,
+                agentId: ev.agentId,
+                agentName: ev.agentName,
+              });
 
-            // If connected call, open disposition modal automatically for agent!
-            if (result.lead && ev.duration > 0) {
-              setDispositionCall({
-                lead: result.lead,
-                attempt: result.attempt,
+              if (result.lead && ev.duration > 0) {
+                setDispositionCall({
+                  lead: result.lead,
+                  attempt: result.attempt,
+                });
+              }
+            }
+          }
+        }
+
+        // 2. Poll Google Sheet Live Calls
+        const sheetRes = await fetch('/api/telephony/sheet-sync');
+        if (sheetRes.ok) {
+          const sheetData = await sheetRes.json();
+          if (sheetData.calls && Array.isArray(sheetData.calls)) {
+            for (const sc of sheetData.calls) {
+              crmStore.syncMobileCallLog({
+                customerNumber: sc.customerNumber,
+                duration: sc.duration,
+                callType: sc.callType,
+                timestamp: sc.timestamp,
+                agentId: sc.agentId,
+                agentName: sc.agentName,
               });
             }
           }
