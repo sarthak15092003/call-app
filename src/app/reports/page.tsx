@@ -37,7 +37,20 @@ export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activeView, setActiveView] = useState<'excel_ledger' | 'daily_summary'>('excel_ledger');
 
-  const loadData = () => {
+  const loadData = async () => {
+    // 1. Fetch latest sheet calls directly so UI never shows empty if localStorage was cleared
+    try {
+      const res = await fetch('/api/telephony/sheet-sync');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.calls && Array.isArray(data.calls) && data.calls.length > 0) {
+          crmStore.syncAllSheetCalls(data.calls);
+        }
+      }
+    } catch (e) {
+      // fallback to store
+    }
+
     const attempts = crmStore.getCallAttempts();
     setCallAttempts(attempts);
 
