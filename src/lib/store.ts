@@ -734,6 +734,137 @@ class CRMStore {
     return { lead, attempt };
   }
 
+  // Direct sync that strictly mirrors the Google Sheet data & dynamic agents
+  syncAllSheetCalls(sheetCalls: any[]): void {
+    if (!Array.isArray(sheetCalls) || sheetCalls.length === 0) return;
+
+    // 1. Convert sheet calls to CallAttempt objects
+    const newAttempts: CallAttempt[] = sheetCalls.map((sc, idx) => {
+      const isConnected = sc.duration > 0;
+      const callStatus: CallStatus = isConnected 
+        ? 'connected' 
+        : (sc.callType === 'MISSED' ? 'no_answer' : (sc.callType === 'REJECTED' ? 'busy' : 'failed'));
+
+      const agentName = String(sc.agentName || '').trim() || 'Agent';
+      const agentId = sc.agentId || ('usr_' + agentName.toLowerCase().replace(/[^a-z0-9]/g, '_'));
+
+      return {
+        id: sc.id || `call_sheet_${Date.parse(sc.timestamp) || Date.now()}_${idx}`,
+        lead_id: `lead_${(sc.customerNumber || '').replace(/\D/g, '').slice(-10)}`,
+        customer_name: sc.customerName || 'Customer',
+        customer_number: sc.customerNumber,
+        agent_id: agentId,
+        agent_name: agentName,
+        agent_number: '',
+        provider: 'mobile_sim',
+        provider_call_id: sc.id || `sheet_${idx}`,
+        status: callStatus,
+        start_time: sc.timestamp,
+        end_time: sc.timestamp,
+        ringing_duration: 0,
+        connected_duration: sc.duration || 0,
+        is_demo: false,
+        created_at: sc.timestamp,
+      };
+    });
+
+    // Save attempts strictly matching the sheet
+    this.saveCallAttempts(newAttempts);
+
+    // 2. Extract dynamic agents from the sheet (e.g. "sarthak's F16")
+    const uniqueAgents = new Map<string, string>();
+    sheetCalls.forEach((sc) => {
+      const name = String(sc.agentName || '').trim();
+      if (name && name !== 'Agent') {
+        const id = sc.agentId || ('usr_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_'));
+        uniqueAgents.set(id, name);
+      }
+    });
+
+    if (uniqueAgents.size > 0) {
+      const updatedUsers: User[] = Array.from(uniqueAgents.entries()).map(([id, name], idx) => ({
+        id,
+        name,
+        email: `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}@smartcall.com`,
+        role: idx === 0 ? 'admin' : 'agent',
+        phone: '',
+        agent_ext: String(101 + idx),
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      }));
+
+      this.saveUsers(updatedUsers);
+      const currentUser = this.getCurrentUser();
+      if (!updatedUsers.some((u) => u.id === currentUser.id)) {
+        this.setCurrentUser(updatedUsers[0].id);
+      }
+    }
+
+    // 3. Update or auto-create Leads matching numbers from the sheet
+    const currentLeads = this.getLeads();
+    const leadsMap = new Map<string, Lead>();
+    currentLeads.forEach((l) => {
+      const cleanPhone = l.phone.replace(/\D/g, '').slice(-10);
+      leadsMap.set(cleanPhone, l);
+    });
+
+    const callsByPhone = new Map<string, any[]>();
+    sheetCalls.forEach((sc) => {
+      const cleanPhone = String(sc.customerNumber || '').replace(/\D/g, '').slice(-10);
+      if (!callsByPhone.has(cleanPhone)) callsByPhone.set(cleanPhone, []);
+      callsByPhone.get(cleanPhone)!.push(sc);
+    });
+
+    callsByPhone.forEach((calls, phone) => {
+      const totalDur = calls.reduce((s, c) => s + (c.duration || 0), 0);
+      const latestCall = calls[calls.length - 1];
+      const callerName = calls.find((c) => c.customerName && c.customerName !== 'Unknown' && !c.customerName.startsWith('Customer ('))?.customerName || latestCall.customerName || `Customer (${latestCall.customerNumber})`;
+      const agentName = String(latestCall.agentName || '').trim() || 'Agent';
+      const agentId = latestCall.agentId || ('usr_' + agentName.toLowerCase().replace(/[^a-z0-9]/g, '_'));
+
+      if (leadsMap.has(phone)) {
+        const existing = leadsMap.get(phone)!;
+        leadsMap.set(phone, {
+          ...existing,
+          name: (existing.name.startsWith('Customer (') || existing.name === 'Unknown') ? callerName : existing.name,
+          call_attempts_count: calls.length,
+          total_connected_duration: totalDur,
+          last_call_at: latestCall.timestamp,
+          last_call_status: latestCall.status,
+          assigned_agent_name: agentName,
+          assigned_agent_id: agentId,
+        });
+      } else {
+        leadsMap.set(phone, {
+          id: `lead_${phone}`,
+          batch_id: 'sheet_synced',
+          name: callerName,
+          phone: latestCall.customerNumber,
+          raw_phone: phone,
+          company: '',
+          email: '',
+          location: '',
+          lead_source: 'Google Sheet Sync',
+          assigned_agent_id: agentId,
+          assigned_agent_name: agentName,
+          remarks: 'Auto-synced from Google Sheet',
+          interest_status: 'Undecided',
+          call_attempts_count: calls.length,
+          total_connected_duration: totalDur,
+          last_call_at: latestCall.timestamp,
+          last_call_status: latestCall.status,
+          next_followup_at: null,
+          is_dnc: false,
+          created_at: latestCall.timestamp || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+    });
+
+    this.saveLeads(Array.from(leadsMap.values()));
+  }
+
   resetToDemoData(): void {
     if (!this.isBrowser()) return;
     localStorage.removeItem(STORAGE_KEYS.LEADS);

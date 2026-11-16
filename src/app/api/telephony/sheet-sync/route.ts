@@ -140,7 +140,14 @@ export async function GET(req: NextRequest) {
       else callType = 'OUTGOING';
 
       const timestamp = String(row['Timestamp'] || row.timestamp || new Date().toISOString()).trim();
-      const agentName = String(row['Agent Name'] || row.agentName || 'sarthak\'s F16').trim();
+      const agentName = String(
+        row['Agent Name'] ||
+        row['agent_name'] ||
+        row['Agent'] ||
+        row.agentName ||
+        row.agent ||
+        ''
+      ).trim() || 'Agent';
 
       const isConnected = duration > 0;
       let status: 'connected' | 'no_answer' | 'busy' | 'failed' = 'failed';
@@ -153,11 +160,13 @@ export async function GET(req: NextRequest) {
       }
 
       const timestampMs = Date.parse(timestamp) || Date.now();
+      const agentId = 'usr_' + agentName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
       const callRecord = {
         id: `call_sheet_${timestampMs}_${cleanPhone.slice(-4)}`,
         customerNumber: phoneNormalized,
         customerName: callerName && callerName !== 'Unknown' ? callerName : `Customer (${phoneNormalized})`,
-        agentId: 'usr_agent_1',
+        agentId,
         agentName,
         status,
         duration,
