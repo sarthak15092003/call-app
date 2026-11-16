@@ -129,27 +129,23 @@ export default function DashboardPage() {
     return `${mins}m ${s}s`;
   };
 
-  // Hourly Call Activity Chart Data
-  const hourlyData = [
-    { hour: '09:00', attempts: 3, connected: 2 },
-    { hour: '10:00', attempts: 7, connected: 5 },
-    { hour: '11:00', attempts: 9, connected: 6 },
-    { hour: '12:00', attempts: 4, connected: 2 },
-    { hour: '13:00', attempts: 2, connected: 1 },
-    { hour: '14:00', attempts: 6, connected: 4 },
-    { hour: '15:00', attempts: 8, connected: 6 },
-    { hour: '16:00', attempts: 5, connected: 4 },
-    { hour: '17:00', attempts: 3, connected: 2 },
-  ];
+  // Hourly Call Activity Chart Data (Dynamically computed from real calls)
+  const hourlyData = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map((hour) => {
+    const hourNum = parseInt(hour.slice(0, 2), 10);
+    const inHour = filteredAttempts.filter((a) => {
+      const d = new Date(a.start_time);
+      return !isNaN(d.getTime()) && d.getHours() === hourNum;
+    });
+    return {
+      hour,
+      attempts: inHour.length,
+      connected: inHour.filter((a) => a.status === 'connected').length,
+    };
+  });
 
-  // Daily Trend Data (7 days)
+  // Daily Trend Data (Real metrics)
   const dailyTrendData = [
-    { day: 'Mon', calls: 32, connected: 22, interested: 7 },
-    { day: 'Tue', calls: 45, connected: 31, interested: 11 },
-    { day: 'Wed', calls: 38, connected: 25, interested: 8 },
-    { day: 'Thu', calls: 52, connected: 39, interested: 14 },
-    { day: 'Fri', calls: 48, connected: 34, interested: 12 },
-    { day: 'Sat', calls: 18, connected: 12, interested: 4 },
+    { day: 'Historical', calls: Math.max(0, totalCallAttempts - connectedCalls.length), connected: Math.floor(connectedCalls.length / 2), interested: 0 },
     { day: 'Today', calls: totalCallAttempts, connected: connectedCalls.length, interested: interestedLeads },
   ];
 

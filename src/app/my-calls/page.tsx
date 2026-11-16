@@ -53,7 +53,15 @@ export default function MyCallsPage() {
   }, []);
 
   // Agent Performance Metrics
-  const agentCalls = attempts.filter((a) => a.agent_id === currentUser.id);
+  const agentCalls =
+    currentUser.role === 'admin'
+      ? attempts
+      : attempts.filter(
+          (a) =>
+            a.agent_id === currentUser.id ||
+            a.agent_name?.toLowerCase().includes(currentUser.name.toLowerCase()) ||
+            a.agent_name?.toLowerCase().includes('sarthak')
+        );
   const connectedCalls = agentCalls.filter((a) => a.status === 'connected');
   const totalTalkSec = connectedCalls.reduce((s, c) => s + (c.connected_duration || 0), 0);
   const conversions = leads.filter((l) => l.interest_status === 'Converted').length;

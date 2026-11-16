@@ -15,40 +15,18 @@ import {
   InterestStatus,
 } from '@/types';
 
-// Demo initial users
+// Production real user
 export const INITIAL_USERS: User[] = [
   {
-    id: 'usr_admin_1',
-    name: 'Rajesh Kumar',
-    email: 'rajesh.kumar@smartcall.com',
+    id: 'usr_sarthak_1',
+    name: 'Sarthak',
+    email: 'sarthak@smartcall.com',
     role: 'admin',
-    phone: '+919820012345',
-    agent_ext: '100',
+    phone: '+918825250913',
+    agent_ext: '101',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
     is_active: true,
-    created_at: '2026-10-01T09:00:00Z',
-  },
-  {
-    id: 'usr_agent_1',
-    name: 'Priya Sharma',
-    email: 'priya.sharma@smartcall.com',
-    role: 'agent',
-    phone: '+919811122334',
-    agent_ext: '101',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
-    is_active: true,
-    created_at: '2026-10-05T09:00:00Z',
-  },
-  {
-    id: 'usr_agent_2',
-    name: 'Vikram Patel',
-    email: 'vikram.patel@smartcall.com',
-    role: 'agent',
-    phone: '+919833344556',
-    agent_ext: '102',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-    is_active: true,
-    created_at: '2026-10-10T09:00:00Z',
+    created_at: '2026-11-16T00:00:00Z',
   },
 ];
 
@@ -157,8 +135,12 @@ class CRMStore {
   // Current User / Role Switcher
   getCurrentUser(): User {
     const users = this.getUsers();
-    const currentId = this.getItem(STORAGE_KEYS.CURRENT_USER_ID, users[0]?.id || 'usr_admin_1');
-    return users.find((u) => u.id === currentId) || users[0] || INITIAL_USERS[0];
+    const currentId = this.getItem(STORAGE_KEYS.CURRENT_USER_ID, users[0]?.id || 'usr_sarthak_1');
+    const user = users.find((u) => u.id === currentId) || users[0] || INITIAL_USERS[0];
+    if (['Rajesh Kumar', 'Priya Sharma', 'Vikram Patel'].includes(user.name)) {
+      return INITIAL_USERS[0];
+    }
+    return user;
   }
 
   setCurrentUser(userId: string): void {
@@ -166,7 +148,10 @@ class CRMStore {
   }
 
   getUsers(): User[] {
-    return this.getItem(STORAGE_KEYS.USERS, INITIAL_USERS);
+    const raw = this.getItem(STORAGE_KEYS.USERS, INITIAL_USERS);
+    const cleaned = raw.filter((u) => !['Rajesh Kumar', 'Priya Sharma', 'Vikram Patel'].includes(u.name));
+    if (cleaned.length === 0) return INITIAL_USERS;
+    return cleaned;
   }
 
   saveUsers(users: User[]): void {

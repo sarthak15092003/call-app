@@ -122,20 +122,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
           title="Clear all demo leads and start fresh with 100% clean live database"
         >
           <RotateCcw className="w-3 h-3" />
-          <span>Clear Dummy Data</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (confirm('Reset CRM database back to initial enterprise demo leads?')) {
-              crmStore.resetToDemoData();
-            }
-          }}
-          className="hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-          title="Restore fresh sample dataset"
-        >
-          <span>Demo Data</span>
+          <span>Clear Data</span>
         </button>
       </div>
     </header>

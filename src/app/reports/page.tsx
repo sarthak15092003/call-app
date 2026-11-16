@@ -28,7 +28,12 @@ export default function ReportsPage() {
   const [emailSuccessMsg, setEmailSuccessMsg] = useState<string | null>(null);
 
   const loadData = () => {
-    const list = crmStore.getReports();
+    let list = crmStore.getReports();
+    if (list.length === 0 && crmStore.getCallAttempts().length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const todayReport = crmStore.generateDailyReport(today);
+      list = [todayReport];
+    }
     setReports(list);
     if (list.length > 0 && !selectedReport) {
       setSelectedReport(list[0]);
