@@ -52,573 +52,34 @@ export const INITIAL_USERS: User[] = [
   },
 ];
 
-export const INITIAL_BATCHES: LeadImportBatch[] = [
-  {
-    id: 'BATCH-20261114-01',
-    file_name: 'Q4_Enterprise_Retail_Leads.xlsx',
-    file_size: 148200,
-    uploaded_by: 'usr_admin_1',
-    uploaded_by_name: 'Rajesh Kumar',
-    uploaded_at: '2026-11-14T08:30:00Z',
-    total_rows: 15,
-    imported_count: 14,
-    invalid_count: 1,
-    duplicate_count: 0,
-    status: 'completed',
-    error_report: [
-      {
-        rowNumber: 7,
-        name: 'Amitabh Sen',
-        phone: '9820-ABC-12',
-        reason: 'Contains non-numeric characters in phone number',
-        rawData: { 'Customer Name': 'Amitabh Sen', 'Mobile Number': '9820-ABC-12', 'Company Name': 'Sen FinTech' }
-      }
-    ]
-  }
-];
+export const INITIAL_BATCHES: LeadImportBatch[] = [];
 
-export const INITIAL_LEADS: Lead[] = [
-  {
-    id: 'lead_01',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Ananya Deshmukh',
-    phone: '+919820154321',
-    raw_phone: '9820154321',
-    company: 'Nexus Tech Labs',
-    email: 'ananya@nexustech.io',
-    location: 'Mumbai, Maharashtra',
-    lead_source: 'LinkedIn Campaign',
-    assigned_agent_id: 'usr_agent_1',
-    assigned_agent_name: 'Priya Sharma',
-    remarks: 'Looking for 25-seat automated outbound calling dialer.',
-    interest_status: 'Interested',
-    call_attempts_count: 2,
-    total_connected_duration: 324,
-    last_call_at: '2026-11-14T10:15:00Z',
-    last_call_status: 'connected',
-    next_followup_at: '2026-11-14T16:00:00Z',
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T10:20:00Z',
-  },
-  {
-    id: 'lead_02',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Karthik Raman',
-    phone: '+919845012345',
-    raw_phone: '09845012345',
-    company: 'Skyline Logistics Solutions',
-    email: 'karthik@skylinelogistics.in',
-    location: 'Bengaluru, Karnataka',
-    lead_source: 'Website Inbound',
-    assigned_agent_id: 'usr_agent_1',
-    assigned_agent_name: 'Priya Sharma',
-    remarks: 'Needs Exotel integration for dispatch tracking.',
-    interest_status: 'Follow-up Required',
-    call_attempts_count: 1,
-    total_connected_duration: 180,
-    last_call_at: '2026-11-14T11:00:00Z',
-    last_call_status: 'connected',
-    next_followup_at: '2026-11-14T15:30:00Z',
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T11:05:00Z',
-  },
-  {
-    id: 'lead_03',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Rohan Mehra',
-    phone: '+919988776655',
-    raw_phone: '+91 99887 76655',
-    company: 'Apex Cloud Solutions',
-    email: 'rohan.mehra@apexcloud.co',
-    location: 'Gurugram, NCR',
-    lead_source: 'Google Ads',
-    assigned_agent_id: 'usr_agent_2',
-    assigned_agent_name: 'Vikram Patel',
-    remarks: 'Currently evaluating between MyOperator and SmartCall CRM.',
-    interest_status: 'Callback Requested',
-    call_attempts_count: 3,
-    total_connected_duration: 410,
-    last_call_at: '2026-11-14T09:40:00Z',
-    last_call_status: 'connected',
-    next_followup_at: '2026-11-15T11:00:00Z',
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T09:45:00Z',
-  },
-  {
-    id: 'lead_04',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Suresh Varma',
-    phone: '+919701234567',
-    raw_phone: '9701234567',
-    company: 'Varma Global Exports',
-    email: 'suresh@varmaglobal.com',
-    location: 'Hyderabad, Telangana',
-    lead_source: 'Trade Fair 2026',
-    assigned_agent_id: 'usr_agent_1',
-    assigned_agent_name: 'Priya Sharma',
-    remarks: 'Lead answered once, then phone went busy on second try.',
-    interest_status: 'Undecided',
-    call_attempts_count: 2,
-    total_connected_duration: 45,
-    last_call_at: '2026-11-14T10:45:00Z',
-    last_call_status: 'busy',
-    next_followup_at: null,
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T10:46:00Z',
-  },
-  {
-    id: 'lead_05',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Meenakshi Iyer',
-    phone: '+919444123456',
-    raw_phone: '+91 94441 23456',
-    company: 'Coromandel Retail Corp',
-    email: 'meenakshi@coromandel.in',
-    location: 'Chennai, Tamil Nadu',
-    lead_source: 'Referral',
-    assigned_agent_id: 'usr_agent_2',
-    assigned_agent_name: 'Vikram Patel',
-    remarks: 'Approved budget. Enterprise package demo scheduled.',
-    interest_status: 'Converted',
-    call_attempts_count: 4,
-    total_connected_duration: 890,
-    last_call_at: '2026-11-14T11:30:00Z',
-    last_call_status: 'connected',
-    next_followup_at: null,
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T11:45:00Z',
-  },
-  {
-    id: 'lead_06',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Devendra Singhal',
-    phone: '+919829012345',
-    raw_phone: '9829012345',
-    company: 'Singhal Steels & Alloys',
-    email: 'devendra@singhalsteels.com',
-    location: 'Jaipur, Rajasthan',
-    lead_source: 'IndiaMART Lead',
-    assigned_agent_id: 'usr_agent_1',
-    assigned_agent_name: 'Priya Sharma',
-    remarks: 'Ringing timeout, no answer after 45 seconds.',
-    interest_status: 'Undecided',
-    call_attempts_count: 1,
-    total_connected_duration: 0,
-    last_call_at: '2026-11-14T09:15:00Z',
-    last_call_status: 'no_answer',
-    next_followup_at: null,
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T09:16:00Z',
-  },
-  {
-    id: 'lead_07',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Pooja Chawla',
-    phone: '+919810098765',
-    raw_phone: '9810098765',
-    company: 'Glamour House Retail',
-    email: 'pooja@glamourhouse.com',
-    location: 'New Delhi, Delhi',
-    lead_source: 'Meta Instagram Ads',
-    assigned_agent_id: 'usr_agent_2',
-    assigned_agent_name: 'Vikram Patel',
-    remarks: 'Customer requested never to call again. Marked as DNC.',
-    interest_status: 'Do Not Contact',
-    call_attempts_count: 1,
-    total_connected_duration: 40,
-    last_call_at: '2026-11-14T10:05:00Z',
-    last_call_status: 'connected',
-    next_followup_at: null,
-    is_dnc: true,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T10:07:00Z',
-  },
-  {
-    id: 'lead_08',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Tanvi Saxena',
-    phone: '+919920045678',
-    raw_phone: '9920045678',
-    company: 'FinEdge Advisory',
-    email: 'tanvi.s@finedge.in',
-    location: 'Pune, Maharashtra',
-    lead_source: 'Cold Outreach',
-    assigned_agent_id: 'usr_agent_1',
-    assigned_agent_name: 'Priya Sharma',
-    remarks: 'New lead uploaded this morning. Not dialed yet.',
-    interest_status: 'Undecided',
-    call_attempts_count: 0,
-    total_connected_duration: 0,
-    last_call_at: null,
-    last_call_status: 'never_called',
-    next_followup_at: null,
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T08:35:00Z',
-  },
-  {
-    id: 'lead_09',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Arjun Nambiar',
-    phone: '+919847055443',
-    raw_phone: '9847055443',
-    company: 'Malabar Spices & Co',
-    email: 'arjun@malabarspices.com',
-    location: 'Kochi, Kerala',
-    lead_source: 'Website Form',
-    assigned_agent_id: 'usr_agent_2',
-    assigned_agent_name: 'Vikram Patel',
-    remarks: 'Requested pricing quotation for 5-agent team.',
-    interest_status: 'Interested',
-    call_attempts_count: 1,
-    total_connected_duration: 210,
-    last_call_at: '2026-11-14T11:10:00Z',
-    last_call_status: 'connected',
-    next_followup_at: '2026-11-16T10:00:00Z',
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T11:15:00Z',
-  },
-  {
-    id: 'lead_10',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Sameer Qureshi',
-    phone: '+919890123987',
-    raw_phone: '9890123987',
-    company: 'Qureshi Automotive Services',
-    email: 'sameer@qureshiauto.in',
-    location: 'Nagpur, Maharashtra',
-    lead_source: 'Local Directory',
-    assigned_agent_id: 'usr_agent_1',
-    assigned_agent_name: 'Priya Sharma',
-    remarks: 'Not interested at this time, existing vendor contract running until Dec.',
-    interest_status: 'Not Interested',
-    call_attempts_count: 1,
-    total_connected_duration: 75,
-    last_call_at: '2026-11-14T09:30:00Z',
-    last_call_status: 'connected',
-    next_followup_at: null,
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T09:32:00Z',
-  },
-  {
-    id: 'lead_11',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Farhan Zaidi',
-    phone: '+919955443322',
-    raw_phone: '9955443322',
-    company: 'Al-Hasan Trading FZE',
-    email: 'farhan@alhasantrading.ae',
-    location: 'Dubai / Mumbai',
-    lead_source: 'Inbound WhatsApp',
-    assigned_agent_id: 'usr_agent_2',
-    assigned_agent_name: 'Vikram Patel',
-    remarks: 'Wants international calling support with recording.',
-    interest_status: 'Follow-up Required',
-    call_attempts_count: 2,
-    total_connected_duration: 290,
-    last_call_at: '2026-11-14T11:50:00Z',
-    last_call_status: 'connected',
-    next_followup_at: '2026-11-14T17:00:00Z',
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T11:55:00Z',
-  },
-  {
-    id: 'lead_12',
-    batch_id: 'BATCH-20261114-01',
-    name: 'Bhavna Kulkarni',
-    phone: '+919860112233',
-    raw_phone: '9860112233',
-    company: 'Sahyadri Agro Foods',
-    email: 'bhavna@sahyadriagro.in',
-    location: 'Nashik, Maharashtra',
-    lead_source: 'AgriExpo 2026',
-    assigned_agent_id: 'usr_agent_1',
-    assigned_agent_name: 'Priya Sharma',
-    remarks: 'Pending first morning call.',
-    interest_status: 'Undecided',
-    call_attempts_count: 0,
-    total_connected_duration: 0,
-    last_call_at: null,
-    last_call_status: 'never_called',
-    next_followup_at: null,
-    is_dnc: false,
-    created_at: '2026-11-14T08:35:00Z',
-    updated_at: '2026-11-14T08:35:00Z',
-  }
-];
+export const INITIAL_LEADS: Lead[] = [];
 
-export const INITIAL_CALL_ATTEMPTS: CallAttempt[] = [
-  {
-    id: 'call_att_01',
-    lead_id: 'lead_01',
-    customer_name: 'Ananya Deshmukh',
-    customer_number: '+919820154321',
-    agent_id: 'usr_agent_1',
-    agent_name: 'Priya Sharma',
-    agent_number: '+919811122334',
-    provider: 'exotel',
-    provider_call_id: 'EXO-LIVE-8921829',
-    status: 'connected',
-    start_time: '2026-11-14T10:15:00Z',
-    ringing_start_time: '2026-11-14T10:15:04Z',
-    connected_start_time: '2026-11-14T10:15:18Z',
-    end_time: '2026-11-14T10:20:42Z',
-    ringing_duration: 14,
-    connected_duration: 324,
-    recording_url: 'https://smartcall-demo.s3.amazonaws.com/recordings/call_01.mp3',
-    is_demo: false,
-    created_at: '2026-11-14T10:15:00Z',
-    transcript: "Agent: Hello Ananya, calling from SmartCall CRM regarding your inquiry on outbound dialers. Customer: Hi Priya, yes! We have 25 agents spending too much time manual dialing. Does your system have automatic call metric logging and Exotel integration? Agent: Absolutely, we support click-to-call, live duration tracking, and automatic evening reports. Customer: That's great, let's connect again at 4 PM with my tech lead.",
-    ai_summary: "Customer confirmed high need for 25-seat automated outbound calling dialer. Expressed strong interest in Exotel integration & evening reports. Requested technical follow-up call at 4:00 PM today.",
-    ai_suggested_interest: 'Interested',
-    ai_confidence: 0.94,
-    ai_objections: ['Wants assurance on Exotel API webhook reliability'],
-    ai_action_items: ['Send technical architecture PDF', 'Join 4 PM demo with Tech Lead'],
-  },
-  {
-    id: 'call_att_02',
-    lead_id: 'lead_02',
-    customer_name: 'Karthik Raman',
-    customer_number: '+919845012345',
-    agent_id: 'usr_agent_1',
-    agent_name: 'Priya Sharma',
-    agent_number: '+919811122334',
-    provider: 'myoperator',
-    provider_call_id: 'MYOP-8829104',
-    status: 'connected',
-    start_time: '2026-11-14T11:00:00Z',
-    ringing_start_time: '2026-11-14T11:00:05Z',
-    connected_start_time: '2026-11-14T11:00:15Z',
-    end_time: '2026-11-14T11:03:15Z',
-    ringing_duration: 10,
-    connected_duration: 180,
-    recording_url: 'https://smartcall-demo.s3.amazonaws.com/recordings/call_02.mp3',
-    is_demo: false,
-    created_at: '2026-11-14T11:00:00Z',
-    transcript: "Agent: Good morning Karthik, this is Priya from SmartCall. Customer: Hello, yes I checked your website. We need driver dispatch telephony alerts. What is the per-minute rate? Agent: Our provider adapter supports your direct Exotel or MyOperator account with zero markup. Customer: Excellent. Please call me back at 3:30 PM after my logistics standup.",
-    ai_summary: "Customer interested in dispatch telephony alerts without call rate markup. Follow-up agreed for 3:30 PM IST.",
-    ai_suggested_interest: 'Follow-up Required',
-    ai_confidence: 0.88,
-    ai_objections: ['Rate comparison with traditional PBX'],
-    ai_action_items: ['Confirm zero markup telecom pass-through model', 'Call back at 3:30 PM'],
-  },
-  {
-    id: 'call_att_03',
-    lead_id: 'lead_04',
-    customer_name: 'Suresh Varma',
-    customer_number: '+919701234567',
-    agent_id: 'usr_agent_1',
-    agent_name: 'Priya Sharma',
-    agent_number: '+919811122334',
-    provider: 'demo',
-    provider_call_id: 'DEMO-CALL-332194',
-    status: 'busy',
-    start_time: '2026-11-14T10:45:00Z',
-    ringing_start_time: '2026-11-14T10:45:03Z',
-    connected_start_time: undefined,
-    end_time: '2026-11-14T10:45:15Z',
-    ringing_duration: 12,
-    connected_duration: 0,
-    is_demo: true,
-    created_at: '2026-11-14T10:45:00Z',
-  },
-  {
-    id: 'call_att_04',
-    lead_id: 'lead_06',
-    customer_name: 'Devendra Singhal',
-    customer_number: '+919829012345',
-    agent_id: 'usr_agent_1',
-    agent_name: 'Priya Sharma',
-    agent_number: '+919811122334',
-    provider: 'demo',
-    provider_call_id: 'DEMO-CALL-442109',
-    status: 'no_answer',
-    start_time: '2026-11-14T09:15:00Z',
-    ringing_start_time: '2026-11-14T09:15:03Z',
-    connected_start_time: undefined,
-    end_time: '2026-11-14T09:15:48Z',
-    ringing_duration: 45,
-    connected_duration: 0,
-    is_demo: true,
-    created_at: '2026-11-14T09:15:00Z',
-  },
-  {
-    id: 'call_att_05',
-    lead_id: 'lead_05',
-    customer_name: 'Meenakshi Iyer',
-    customer_number: '+919444123456',
-    agent_id: 'usr_agent_2',
-    agent_name: 'Vikram Patel',
-    agent_number: '+919833344556',
-    provider: 'exotel',
-    provider_call_id: 'EXO-LIVE-9012485',
-    status: 'connected',
-    start_time: '2026-11-14T11:30:00Z',
-    ringing_start_time: '2026-11-14T11:30:04Z',
-    connected_start_time: '2026-11-14T11:30:14Z',
-    end_time: '2026-11-14T11:45:04Z',
-    ringing_duration: 10,
-    connected_duration: 890,
-    recording_url: 'https://smartcall-demo.s3.amazonaws.com/recordings/call_05.mp3',
-    is_demo: false,
-    created_at: '2026-11-14T11:30:00Z',
-    transcript: "Agent: Hello Ms. Iyer, following up on our proposal. Customer: Hi Vikram! Our executive committee reviewed the pricing and approved the 50-user Enterprise contract. We want to start onboarding on Monday! Agent: Fantastic news! I am sending over the MSA and digital onboarding link right now.",
-    ai_summary: "Deal successfully closed! Executive committee approved 50-user enterprise contract with onboarding scheduled for Monday.",
-    ai_suggested_interest: 'Converted',
-    ai_confidence: 0.98,
-    ai_objections: [],
-    ai_action_items: ['Send Master Services Agreement', 'Trigger onboarding credentials'],
-  }
-];
+export const INITIAL_CALL_ATTEMPTS: CallAttempt[] = [];
 
-export const INITIAL_FOLLOWUPS: FollowUp[] = [
-  {
-    id: 'fup_01',
-    lead_id: 'lead_01',
-    lead_name: 'Ananya Deshmukh',
-    lead_phone: '+919820154321',
-    lead_company: 'Nexus Tech Labs',
-    agent_id: 'usr_agent_1',
-    agent_name: 'Priya Sharma',
-    scheduled_at: '2026-11-14T16:00:00Z',
-    priority: 'urgent',
-    status: 'pending',
-    notes: 'Conference call with Tech Lead & Ananya regarding Exotel webhook and CRM setup.',
-    created_at: '2026-11-14T10:20:00Z',
-  },
-  {
-    id: 'fup_02',
-    lead_id: 'lead_02',
-    lead_name: 'Karthik Raman',
-    lead_phone: '+919845012345',
-    lead_company: 'Skyline Logistics Solutions',
-    agent_id: 'usr_agent_1',
-    agent_name: 'Priya Sharma',
-    scheduled_at: '2026-11-14T15:30:00Z',
-    priority: 'high',
-    status: 'pending',
-    notes: 'Discuss per-minute zero-markup telecom model and dispatch API.',
-    created_at: '2026-11-14T11:05:00Z',
-  },
-  {
-    id: 'fup_03',
-    lead_id: 'lead_11',
-    lead_name: 'Farhan Zaidi',
-    lead_phone: '+919955443322',
-    lead_company: 'Al-Hasan Trading FZE',
-    agent_id: 'usr_agent_2',
-    agent_name: 'Vikram Patel',
-    scheduled_at: '2026-11-14T17:00:00Z',
-    priority: 'high',
-    status: 'pending',
-    notes: 'Verify international DID support and call recording consent banner.',
-    created_at: '2026-11-14T11:55:00Z',
-  },
-  {
-    id: 'fup_04',
-    lead_id: 'lead_03',
-    lead_name: 'Rohan Mehra',
-    lead_phone: '+919988776655',
-    lead_company: 'Apex Cloud Solutions',
-    agent_id: 'usr_agent_2',
-    agent_name: 'Vikram Patel',
-    scheduled_at: '2026-11-15T11:00:00Z',
-    priority: 'normal',
-    status: 'pending',
-    notes: 'Second demo showing comparison matrix with MyOperator.',
-    created_at: '2026-11-14T09:45:00Z',
-  },
-  {
-    id: 'fup_05',
-    lead_id: 'lead_09',
-    lead_name: 'Arjun Nambiar',
-    lead_phone: '+919847055443',
-    lead_company: 'Malabar Spices & Co',
-    agent_id: 'usr_agent_2',
-    agent_name: 'Vikram Patel',
-    scheduled_at: '2026-11-16T10:00:00Z',
-    priority: 'normal',
-    status: 'pending',
-    notes: 'Deliver 5-seat startup plan quotation.',
-    created_at: '2026-11-14T11:15:00Z',
-  }
-];
+export const INITIAL_FOLLOWUPS: FollowUp[] = [];
 
 export const INITIAL_SETTINGS: IntegrationSettings = {
   telephony_provider: 'demo',
-  exotel_account_sid: 'exotel_subdomain_demo_sid',
-  exotel_api_key: 'exo_key_98a72b0c4d',
-  exotel_api_token: 'exo_tok_d83e1c2b5f',
-  exotel_caller_id: '08047190000',
-  myoperator_token: 'myop_auth_tok_88192a',
-  myoperator_company_id: 'myop_comp_7721',
-  myoperator_caller_id: '01149200000',
+  exotel_account_sid: '',
+  exotel_api_key: '',
+  exotel_api_token: '',
+  exotel_caller_id: '',
+  myoperator_token: '',
+  myoperator_company_id: '',
+  myoperator_caller_id: '',
   webhook_secret: 'smartcall_wh_secret_2026',
   recording_enabled: true,
   transcription_enabled: true,
   ai_analysis_enabled: true,
   daily_report_time: '18:00',
-  daily_report_emails: ['sales-ops@smartcall.com', 'director@smartcall.com'],
-  is_demo_mode: true,
-  updated_at: '2026-11-14T08:00:00Z',
+  daily_report_emails: [],
+  is_demo_mode: false,
+  updated_at: new Date().toISOString(),
 };
 
-export const INITIAL_REPORTS: DailyReport[] = [
-  {
-    id: 'rep_20261113',
-    report_date: '2026-11-13',
-    generated_at: '2026-11-13T18:00:00Z',
-    schedule_time: '18:00',
-    total_leads: 18,
-    total_attempts: 24,
-    connected_calls: 16,
-    unanswered_calls: 5,
-    busy_calls: 2,
-    failed_calls: 1,
-    total_talk_time_seconds: 3420,
-    avg_talk_time_seconds: 213,
-    interested_count: 5,
-    not_interested_count: 3,
-    pending_followups: 4,
-    status: 'emailed',
-    email_recipients: ['sales-ops@smartcall.com', 'director@smartcall.com'],
-    agent_stats: [
-      {
-        agent_id: 'usr_agent_1',
-        agent_name: 'Priya Sharma',
-        total_assigned: 10,
-        call_attempts: 14,
-        connected_calls: 10,
-        total_duration_seconds: 2100,
-        conversions: 1,
-        interested: 3,
-        not_interested: 2,
-        callback_requested: 2,
-      },
-      {
-        agent_id: 'usr_agent_2',
-        agent_name: 'Vikram Patel',
-        total_assigned: 8,
-        call_attempts: 10,
-        connected_calls: 6,
-        total_duration_seconds: 1320,
-        conversions: 0,
-        interested: 2,
-        not_interested: 1,
-        callback_requested: 1,
-      }
-    ]
-  }
-];
+export const INITIAL_REPORTS: DailyReport[] = [];
 
 export const INITIAL_AUDIT_LOGS: AuditLog[] = [
   {
@@ -714,7 +175,8 @@ class CRMStore {
 
   // Leads
   getLeads(): Lead[] {
-    return this.getItem(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+    const raw = this.getItem(STORAGE_KEYS.LEADS, INITIAL_LEADS);
+    return raw.filter((l) => !l.batch_id?.startsWith('BATCH-20261114') && !l.id?.startsWith('lead_0') && !l.id?.startsWith('lead_1'));
   }
 
   saveLeads(leads: Lead[]): void {
@@ -868,7 +330,8 @@ class CRMStore {
 
   // Batches
   getBatches(): LeadImportBatch[] {
-    return this.getItem(STORAGE_KEYS.BATCHES, INITIAL_BATCHES);
+    const raw = this.getItem(STORAGE_KEYS.BATCHES, INITIAL_BATCHES);
+    return raw.filter((b) => !b.id?.startsWith('BATCH-20261114'));
   }
 
   saveBatches(batches: LeadImportBatch[]): void {
@@ -877,7 +340,8 @@ class CRMStore {
 
   // Call Attempts
   getCallAttempts(): CallAttempt[] {
-    return this.getItem(STORAGE_KEYS.CALL_ATTEMPTS, INITIAL_CALL_ATTEMPTS);
+    const raw = this.getItem(STORAGE_KEYS.CALL_ATTEMPTS, INITIAL_CALL_ATTEMPTS);
+    return raw.filter((a) => !a.id?.startsWith('call_att_0'));
   }
 
   saveCallAttempts(attempts: CallAttempt[]): void {
@@ -968,7 +432,8 @@ class CRMStore {
 
   // Follow-ups
   getFollowUps(): FollowUp[] {
-    return this.getItem(STORAGE_KEYS.FOLLOWUPS, INITIAL_FOLLOWUPS);
+    const raw = this.getItem(STORAGE_KEYS.FOLLOWUPS, INITIAL_FOLLOWUPS);
+    return raw.filter((f) => !f.id?.startsWith('fup_0'));
   }
 
   saveFollowUps(followups: FollowUp[]): void {
@@ -1145,9 +610,11 @@ class CRMStore {
     return leads.some((l) => l.id.startsWith('lead_'));
   }
 
-  // Handle call logs synced from Android Mobile App
+  // Handle call logs synced from Android Mobile App or Google Sheet
   syncMobileCallLog(log: {
+    id?: string;
     customerNumber: string;
+    customerName?: string;
     duration: number; // in seconds
     callType: 'OUTGOING' | 'INCOMING' | 'MISSED' | 'REJECTED';
     timestamp: string;
@@ -1157,12 +624,25 @@ class CRMStore {
   }): { lead?: Lead; attempt: CallAttempt } {
     const leads = this.getLeads();
     const cleanCustomerNum = log.customerNumber.replace(/\D/g, '');
-    
-    // Find lead by exact phone or last 10 digits
-    const lead = leads.find((l) => {
+    const cleanLast10 = cleanCustomerNum.slice(-10);
+
+    // 1. Prevent duplicate additions of identical call attempts
+    const existingAttempts = this.getCallAttempts();
+    const callAttemptId = log.id || `call_mob_${Date.parse(log.timestamp) || Date.now()}_${cleanCustomerNum.slice(-4)}`;
+    const duplicate = existingAttempts.find((a) => a.id === callAttemptId || (
+      a.customer_number.replace(/\D/g, '').endsWith(cleanLast10) &&
+      Math.abs(new Date(a.start_time).getTime() - new Date(log.timestamp).getTime()) < 5000
+    ));
+    if (duplicate) {
+      const matched = leads.find((l) => l.phone.replace(/\D/g, '').endsWith(cleanLast10));
+      return { lead: matched, attempt: duplicate };
+    }
+
+    // 2. Find matching uploaded lead by phone (exact or last 10 digits)
+    let lead = leads.find((l) => {
       const cleanLeadNum = l.phone.replace(/\D/g, '');
       return cleanLeadNum === cleanCustomerNum || 
-             (cleanCustomerNum.length >= 10 && cleanLeadNum.endsWith(cleanCustomerNum.slice(-10)));
+             (cleanLast10.length >= 7 && cleanLeadNum.endsWith(cleanLast10));
     });
 
     const isConnected = log.duration > 0;
@@ -1170,21 +650,68 @@ class CRMStore {
       ? 'connected' 
       : (log.callType === 'MISSED' ? 'no_answer' : (log.callType === 'REJECTED' ? 'busy' : 'failed'));
 
+    const agentName = log.agentName || 'sarthak\'s F16';
     const agent = log.agentId 
-      ? this.getUsers().find((u) => u.id === log.agentId) || this.getCurrentUser()
-      : this.getCurrentUser();
+      ? this.getUsers().find((u) => u.id === log.agentId) || { id: 'usr_agent_1', name: agentName, phone: '' }
+      : { id: 'usr_agent_1', name: agentName, phone: '' };
 
-    // Create CallAttempt record
+    // 3. If NO lead exists in the database for this number, auto-create a real Lead so it appears on Dashboard and Leads table
+    if (!lead) {
+      const newLead: Lead = {
+        id: `lead_synced_${Date.now()}_${cleanCustomerNum.slice(-4)}`,
+        batch_id: 'sheet_synced',
+        name: (log.customerName && log.customerName !== 'Unknown' && log.customerName !== 'Caller')
+          ? log.customerName
+          : `Customer (${log.customerNumber})`,
+        phone: log.customerNumber,
+        raw_phone: cleanCustomerNum,
+        company: '',
+        email: '',
+        location: '',
+        lead_source: 'Mobile Carrier Call',
+        assigned_agent_id: agent.id,
+        assigned_agent_name: agentName,
+        remarks: `Logged via phone call sync (${log.callType})`,
+        interest_status: 'Undecided',
+        call_attempts_count: 1,
+        total_connected_duration: log.duration,
+        last_call_at: log.timestamp || new Date().toISOString(),
+        last_call_status: callStatus,
+        next_followup_at: null,
+        is_dnc: false,
+        created_at: log.timestamp || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      this.saveLeads([newLead, ...leads]);
+      lead = newLead;
+    } else {
+      // 4. If lead exists, update its counters and metrics!
+      const bestName = (lead.name.startsWith('Customer (') || lead.name === 'Unknown') &&
+                       log.customerName && log.customerName !== 'Unknown' && log.customerName !== 'Caller'
+        ? log.customerName
+        : lead.name;
+
+      lead = this.updateLead(lead.id, {
+        name: bestName,
+        call_attempts_count: (lead.call_attempts_count || 0) + 1,
+        total_connected_duration: (lead.total_connected_duration || 0) + log.duration,
+        last_call_at: log.timestamp || new Date().toISOString(),
+        last_call_status: callStatus,
+      });
+    }
+
+    // 5. Create CallAttempt record
     const attempt: CallAttempt = {
-      id: `call_mob_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      lead_id: lead ? lead.id : 'unknown',
-      customer_name: lead ? lead.name : `Customer (${log.customerNumber})`,
+      id: callAttemptId,
+      lead_id: lead.id,
+      customer_name: lead.name,
       customer_number: log.customerNumber,
       agent_id: agent.id,
-      agent_name: agent.name,
-      agent_number: agent.phone,
+      agent_name: agentName,
+      agent_number: agent.phone || '',
       provider: 'mobile_sim',
-      provider_call_id: `mob_${Date.now()}`,
+      provider_call_id: callAttemptId,
       status: callStatus,
       start_time: log.timestamp || new Date().toISOString(),
       end_time: new Date(new Date(log.timestamp || Date.now()).getTime() + log.duration * 1000).toISOString(),
@@ -1194,27 +721,16 @@ class CRMStore {
       created_at: new Date().toISOString(),
     };
 
-    this.saveCallAttempts([attempt, ...this.getCallAttempts()]);
-
-    // If lead matched, update counters
-    let updatedLead: Lead | undefined;
-    if (lead) {
-      updatedLead = this.updateLead(lead.id, {
-        call_attempts_count: lead.call_attempts_count + 1,
-        total_connected_duration: lead.total_connected_duration + log.duration,
-        last_call_at: attempt.start_time,
-        last_call_status: attempt.status,
-      });
-    }
+    this.saveCallAttempts([attempt, ...existingAttempts]);
 
     this.logAudit({
       action: 'MOBILE_CALL_SYNCED',
       entity_type: 'call',
       entity_id: attempt.id,
-      details: `Mobile SIM call synced for ${log.customerNumber}. Duration: ${log.duration}s, Status: ${callStatus}, Agent: ${agent.name}`,
+      details: `Mobile SIM call synced for ${log.customerNumber}. Duration: ${log.duration}s, Status: ${callStatus}, Agent: ${agentName}`,
     });
 
-    return { lead: updatedLead, attempt };
+    return { lead, attempt };
   }
 
   resetToDemoData(): void {

@@ -3,100 +3,144 @@ import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-const DEFAULT_SHEET_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzid-mA-6PJSUWIrkJLWnsqqpm468CX6teWdRKKbXR6t_KBg7m4IzuFZq7knQJLzwIDdg/exec';
+const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1mohRe5T9ADmM1YmW_b3OqInSL88YYeroW9aU0QkLLn8/gviz/tq?tqx=out:csv&sheet=Final%20Log';
+const FALLBACK_CSV_URL = 'https://docs.google.com/spreadsheets/d/1mohRe5T9ADmM1YmW_b3OqInSL88YYeroW9aU0QkLLn8/gviz/tq?tqx=out:csv';
+const APPS_SCRIPT_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzid-mA-6PJSUWIrkJLWnsqqpm468CX6teWdRKKbXR6t_KBg7m4IzuFZq7knQJLzwIDdg/exec';
+
+function parseCsvLine(line: string): string[] {
+  const row: string[] = [];
+  let cell = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      row.push(cell.trim());
+      cell = '';
+    } else {
+      cell += c;
+    }
+  }
+  row.push(cell.trim());
+  return row;
+}
+
+function parseDurationSeconds(dur: any): number {
+  if (typeof dur === 'number') return dur;
+  const s = String(dur || '0').trim().toLowerCase();
+  const minMatch = s.match(/(\d+)\s*m/);
+  const secMatch = s.match(/(\d+)\s*s/);
+  if (minMatch || secMatch) {
+    return (minMatch ? parseInt(minMatch[1], 10) * 60 : 0) + (secMatch ? parseInt(secMatch[1], 10) : 0);
+  }
+  const clean = parseInt(s.replace(/\D/g, ''), 10);
+  return isNaN(clean) ? 0 : clean;
+}
 
 /**
- * Endpoint to sync real carrier calls from Google Sheet Web App
+ * Endpoint to sync real carrier calls from Google Sheet (Final Log)
  * GET /api/telephony/sheet-sync
  */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const execUrl = searchParams.get('url') || DEFAULT_SHEET_EXEC_URL;
+    const customUrl = searchParams.get('url');
 
-    // Fetch live call logs from Google Apps Script Web App
-    const response = await fetch(execUrl, {
-      method: 'GET',
-      redirect: 'follow',
-      headers: {
-        'Accept': 'application/json',
-      },
-      cache: 'no-store'
-    });
+    let rows: any[] = [];
 
-    if (!response.ok) {
-      return NextResponse.json({ error: `Failed to fetch from Google Sheet Web App (HTTP ${response.status})` }, { status: 502 });
-    }
+    // 1. Try Google Sheet CSV export from Final Log sheet
+    try {
+      const targetUrl = customUrl || GOOGLE_SHEET_CSV_URL;
+      const csvRes = await fetch(targetUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        cache: 'no-store',
+      });
 
-    const json = await response.json();
-    const rawRows: any[] = json.data || [];
-
-    // ── Merge duplicate pairs (START row + END row) into one call ─────────────
-    // Pattern: two consecutive rows with same phone within 10 min, both duration=0
-    // The START row has "Unknown" name; END row has real name + agent
-    const mergedRows: any[] = [];
-    for (let i = 0; i < rawRows.length; i++) {
-      const row = rawRows[i];
-      const phone1 = String(row['Phone Number'] || row.phone || '').replace(/\D/g, '').slice(-10);
-      const dur1   = Number(row['Duration (Seconds)'] || row.duration || 0);
-      const type1  = String(row['Call Type'] || '').toUpperCase();
-
-      // If this row has duration=0 or is IN_PROGRESS, try to find its END pair
-      if ((dur1 === 0 || type1 === 'IN_PROGRESS') && i + 1 < rawRows.length) {
-        const next   = rawRows[i + 1];
-        const phone2 = String(next['Phone Number'] || next.phone || '').replace(/\D/g, '').slice(-10);
-        const dur2   = Number(next['Duration (Seconds)'] || next.duration || 0);
-
-        if (phone1 && phone1 === phone2) {
-          // Parse timestamps to calculate real duration
-          const t1 = new Date(row['Timestamp']  || row.timestamp  || 0).getTime();
-          const t2 = new Date(next['Timestamp'] || next.timestamp || 0).getTime();
-          const diffSec = t1 && t2 && t2 > t1 ? Math.round((t2 - t1) / 1000) : Math.max(dur1, dur2);
-
-          // Prefer END row's caller name (it has the real contact name)
-          const bestName = (String(next['Caller Name'] || next.callerName || '') !== 'Unknown' &&
-                            String(next['Caller Name'] || next.callerName || '') !== '')
-                           ? (next['Caller Name'] || next.callerName)
-                           : (row['Caller Name']  || row.callerName);
-
-          mergedRows.push({
-            'Timestamp':        row['Timestamp'] || row.timestamp,   // use START time
-            'Caller Name':      bestName,
-            'Phone Number':     row['Phone Number'] || row.phone,
-            'Duration (Seconds)': diffSec,                           // calculated ✅
-            'Call Type':        'OUTGOING',
-            'Agent Name':       next['Agent Name'] || next.agentName || row['Agent Name'] || row.agentName,
-          });
-          i++; // skip the END row (already consumed)
-          continue;
+      if (csvRes.ok) {
+        const text = await csvRes.text();
+        if (text && text.includes(',')) {
+          const lines = text.trim().split('\n').map((l) => l.replace(/\r/g, '')).filter(Boolean);
+          if (lines.length > 1) {
+            const headers = parseCsvLine(lines[0]);
+            for (let i = 1; i < lines.length; i++) {
+              const cols = parseCsvLine(lines[i]);
+              const rowObj: Record<string, any> = {};
+              for (let j = 0; j < headers.length; j++) {
+                rowObj[headers[j]] = cols[j] || '';
+              }
+              rows.push(rowObj);
+            }
+          }
         }
       }
-
-      mergedRows.push(row); // non-duplicate row, pass through as-is
+    } catch (csvErr) {
+      console.warn('[CSV fetch failed, falling back to Apps Script]', csvErr);
     }
 
-    const rows = mergedRows;
+    // 2. Fallback to default sheet CSV or Apps Script if rows is still empty
+    if (rows.length === 0) {
+      try {
+        const fallbackRes = await fetch(FALLBACK_CSV_URL, { cache: 'no-store' });
+        if (fallbackRes.ok) {
+          const text = await fallbackRes.text();
+          const lines = text.trim().split('\n').map((l) => l.replace(/\r/g, '')).filter(Boolean);
+          if (lines.length > 1) {
+            const headers = parseCsvLine(lines[0]);
+            for (let i = 1; i < lines.length; i++) {
+              const cols = parseCsvLine(lines[i]);
+              const rowObj: Record<string, any> = {};
+              for (let j = 0; j < headers.length; j++) {
+                rowObj[headers[j]] = cols[j] || '';
+              }
+              rows.push(rowObj);
+            }
+          }
+        }
+      } catch (fbErr) {
+        console.warn('[Fallback CSV failed]', fbErr);
+      }
+    }
+
+    // 3. Fallback to Apps Script if CSV unavailable
+    if (rows.length === 0) {
+      try {
+        const appScriptRes = await fetch(APPS_SCRIPT_EXEC_URL, { cache: 'no-store' });
+        if (appScriptRes.ok) {
+          const json = await appScriptRes.json();
+          rows = json.data || [];
+        }
+      } catch (asErr) {
+        console.warn('[Apps Script fallback failed]', asErr);
+      }
+    }
+
     const syncedCalls: any[] = [];
 
     for (const row of rows) {
       const rawPhone = String(row['Phone Number'] || row.phone || row.number || '').trim();
-      if (!rawPhone) continue;
+      const cleanPhone = rawPhone.replace(/\D/g, '');
+      if (cleanPhone.length < 5) continue;
 
-      const phoneNormalized = rawPhone.startsWith('+') ? rawPhone : (rawPhone.length === 10 ? `+91${rawPhone}` : `+${rawPhone}`);
-      const rawDur = String(row['Duration (Seconds)'] || row.duration || '0');
-      // Handle "1m 23s", "45s", plain number
-      let duration = 0;
-      const minMatch = rawDur.match(/(\d+)m/);
-      const secMatch = rawDur.match(/(\d+)s/);
-      if (minMatch || secMatch) {
-        duration = (minMatch ? parseInt(minMatch[1]) * 60 : 0) + (secMatch ? parseInt(secMatch[1]) : 0);
-      } else {
-        duration = parseInt(rawDur, 10) || 0;
-      }
-      const callerName = row['Caller Name'] || row.callerName || row.name || 'Caller';
-      const callType = (row['Call Type'] || row.callType || 'OUTGOING').toUpperCase();
-      const timestamp = row['Timestamp'] || row.timestamp || new Date().toISOString();
-      const agentName = row['Agent Name'] || row.agentName || 'Mobile Agent';
+      const phoneNormalized = rawPhone.startsWith('+')
+        ? rawPhone
+        : (cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`);
+
+      const duration = parseDurationSeconds(row['Duration'] || row['Duration (Seconds)'] || row.duration || 0);
+      const callerName = String(row['Caller Name'] || row.callerName || row.name || 'Caller').trim();
+      let callType = String(row['Call Type'] || row.callType || 'OUTGOING').toUpperCase().trim();
+      if (callType.includes('INCOMING')) callType = 'INCOMING';
+      else if (callType.includes('MISSED')) callType = 'MISSED';
+      else callType = 'OUTGOING';
+
+      const timestamp = String(row['Timestamp'] || row.timestamp || new Date().toISOString()).trim();
+      const agentName = String(row['Agent Name'] || row.agentName || 'sarthak\'s F16').trim();
 
       const isConnected = duration > 0;
       let status: 'connected' | 'no_answer' | 'busy' | 'failed' = 'failed';
@@ -104,16 +148,15 @@ export async function GET(req: NextRequest) {
         status = 'connected';
       } else if (callType === 'MISSED') {
         status = 'no_answer';
-      } else if (callType === 'REJECTED' || callType === 'BUSY') {
-        status = 'busy';
       } else {
         status = 'failed';
       }
 
+      const timestampMs = Date.parse(timestamp) || Date.now();
       const callRecord = {
-        id: `call_sheet_${Date.parse(timestamp) || Date.now()}_${phoneNormalized.replace(/\D/g, '').slice(-4)}`,
+        id: `call_sheet_${timestampMs}_${cleanPhone.slice(-4)}`,
         customerNumber: phoneNormalized,
-        customerName: callerName,
+        customerName: callerName && callerName !== 'Unknown' ? callerName : `Customer (${phoneNormalized})`,
         agentId: 'usr_agent_1',
         agentName,
         status,
@@ -122,15 +165,14 @@ export async function GET(req: NextRequest) {
         callType,
         timestamp,
         provider: 'mobile_sim',
-        syncedAt: new Date().toISOString()
+        syncedAt: new Date().toISOString(),
       };
 
       syncedCalls.push(callRecord);
 
-      // Persist to Supabase if connected
+      // Persist to Supabase and update leads
       if (supabase) {
         try {
-          // Check if already inserted
           const { data: existing } = await supabase
             .from('call_attempts')
             .select('id')
@@ -139,9 +181,9 @@ export async function GET(req: NextRequest) {
 
           if (!existing || existing.length === 0) {
             let leadId: string | null = null;
-            const cleanNumber = phoneNormalized.replace(/\D/g, '').slice(-10);
+            const cleanNumber = cleanPhone.slice(-10);
 
-            // Match lead in Supabase
+            // Match existing uploaded lead in Supabase
             const { data: matchedLeads } = await supabase.from('leads').select('*').limit(200);
             if (matchedLeads && matchedLeads.length > 0) {
               const match = matchedLeads.find((l: any) => {
@@ -155,10 +197,33 @@ export async function GET(req: NextRequest) {
                 await supabase.from('leads').update({
                   call_attempts_count: (match.call_attempts_count || 0) + 1,
                   total_connected_duration: (match.total_connected_duration || 0) + duration,
-                  last_call_at: timestamp,
+                  last_call_at: new Date(timestampMs).toISOString(),
                   last_call_status: status,
                   updated_at: new Date().toISOString(),
                 }).eq('id', match.id);
+              }
+            }
+
+            // Auto-create lead in Supabase if not found so CRM shows it
+            if (!leadId) {
+              const { data: createdLead } = await supabase.from('leads').insert({
+                name: callerName && callerName !== 'Unknown' ? callerName : `Lead (${phoneNormalized})`,
+                phone: phoneNormalized,
+                raw_phone: cleanPhone,
+                company: '',
+                email: '',
+                location: '',
+                lead_source: 'Carrier Call',
+                remarks: `Logged from phone sync (${callType})`,
+                interest_status: 'Undecided',
+                call_attempts_count: 1,
+                total_connected_duration: duration,
+                last_call_at: new Date(timestampMs).toISOString(),
+                last_call_status: status,
+              }).select('id').single();
+
+              if (createdLead) {
+                leadId = createdLead.id;
               }
             }
 
@@ -173,7 +238,7 @@ export async function GET(req: NextRequest) {
               connected_duration: duration,
               provider: 'mobile_sim',
               provider_call_id: callRecord.id,
-              start_time: timestamp,
+              start_time: new Date(timestampMs).toISOString(),
             });
           }
         } catch (dbErr) {
@@ -184,9 +249,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      source: 'Google Sheet (Final Log)',
       count: syncedCalls.length,
       calls: syncedCalls,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
     console.error('[Sheet Sync Error]', err);

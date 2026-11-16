@@ -84,7 +84,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (sheetData.calls && Array.isArray(sheetData.calls)) {
             for (const sc of sheetData.calls) {
               crmStore.syncMobileCallLog({
+                id: sc.id,
                 customerNumber: sc.customerNumber,
+                customerName: sc.customerName,
                 duration: sc.duration,
                 callType: sc.callType,
                 timestamp: sc.timestamp,
