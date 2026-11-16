@@ -41,14 +41,15 @@ export default function ReportsPage() {
     const attempts = crmStore.getCallAttempts();
     setCallAttempts(attempts);
 
-    let list = crmStore.getReports();
-    if (list.length === 0 && attempts.length > 0) {
+    // Always regenerate/refresh today's report based on the real deduplicated call attempts
+    if (attempts.length > 0) {
       const today = new Date().toISOString().split('T')[0];
-      const todayReport = crmStore.generateDailyReport(today);
-      list = [todayReport];
+      crmStore.generateDailyReport(today);
     }
+
+    const list = crmStore.getReports();
     setReports(list);
-    if (list.length > 0 && !selectedReport) {
+    if (list.length > 0) {
       setSelectedReport(list[0]);
     }
   };

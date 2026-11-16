@@ -467,7 +467,9 @@ class CRMStore {
 
   // Daily Reports
   getReports(): DailyReport[] {
-    return this.getItem(STORAGE_KEYS.REPORTS, INITIAL_REPORTS);
+    const raw = this.getItem(STORAGE_KEYS.REPORTS, INITIAL_REPORTS);
+    // Filter out obsolete reports that had inflated duplicate call counts (> 100 calls or demo id)
+    return raw.filter((r) => !r.id.startsWith('rep_demo') && r.total_attempts < 500);
   }
 
   saveReports(reports: DailyReport[]): void {
