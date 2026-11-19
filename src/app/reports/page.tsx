@@ -70,36 +70,29 @@ export default function ReportsPage() {
     }
     return DEFAULT_DISPOSITIONS;
   });
+  const [selectedDispositions, setSelectedDispositions] = useState<Record<string, string>>({});
+  const [savedRowIds, setSavedRowIds] = useState<Record<string, boolean>>({});
   const [updatingRowId, setUpdatingRowId] = useState<string | null>(null);
 
-  const handleAddCustomOption = () => {
-    const newItem = prompt('Enter new disposition / call status item (e.g. VIP Client, Pricing Issue, Demo Booked):');
-    if (newItem && newItem.trim()) {
-      const trimmed = newItem.trim();
-      if (!dispositionOptions.includes(trimmed)) {
-        const updated = [...dispositionOptions, trimmed];
-        setDispositionOptions(updated);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('smartcall_disposition_options', JSON.stringify(updated));
-        }
-      }
-    }
-  };
-
-  const handleUpdateDisposition = async (call: CallAttempt, newDisp: string) => {
-    if (newDisp === '__ADD_NEW__') {
+  const handleSelectDispositionChange = (callId: string, val: string) => {
+    if (val === '__ADD_NEW__') {
       handleAddCustomOption();
       return;
     }
+    setSelectedDispositions((prev) => ({ ...prev, [callId]: val }));
+  };
+
+  const handleSaveDisposition = async (call: CallAttempt) => {
+    const chosenDisp = selectedDispositions[call.id] || call.disposition;
+    if (!chosenDisp) return;
 
     setUpdatingRowId(call.id);
 
-    // 1. Update in local store
     try {
-      crmStore.updateCallAttempt(call.id, { disposition: newDisp });
+      crmStore.updateCallAttempt(call.id, { disposition: chosenDisp });
       setCallAttempts(crmStore.getCallAttempts());
 
-      // 2. Direct Sync to Google Apps Script via no-cors mode to ensure it goes through immediately
+      // 1. Direct Sync to Google Apps Script
       fetch('https://script.google.com/macros/s/AKfycbydty91hkWznt4kQiJA7_m2TKU5UbLEWpKLGrlSCAc7rIvAOcVYhzVI8BZwhr0pd3Rq/exec', {
         method: 'POST',
         mode: 'no-cors',
@@ -108,22 +101,28 @@ export default function ReportsPage() {
           action: 'UPDATE_DISPOSITION',
           phone: call.customer_number,
           row: call.sheet_row,
-          disposition: newDisp,
+          disposition: chosenDisp,
           callId: call.id,
         }),
       }).catch(() => {});
 
-      // 3. Also Sync via internal server route
+      // 2. Sync via internal route
       await fetch('/api/telephony/update-disposition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone: call.customer_number,
           sheetRow: call.sheet_row,
-          disposition: newDisp,
+          disposition: chosenDisp,
           callId: call.id,
         }),
       });
+
+      // Mark saved checkmark
+      setSavedRowIds((prev) => ({ ...prev, [call.id]: true }));
+      setTimeout(() => {
+        setSavedRowIds((prev) => ({ ...prev, [call.id]: false }));
+      }, 2500);
     } catch (err) {
       console.error('Failed to update disposition:', err);
     } finally {
@@ -569,17 +568,17 @@ export default function ReportsPage() {
                         <td className="px-4 py-2">
                           <div className="flex items-center gap-1.5">
                             <select
-                              value={call.disposition || ''}
+                              value={selectedDispositions[call.id] !== undefined ? selectedDispositions[call.id] : (call.disposition || '')}
                               disabled={updatingRowId === call.id}
-                              onChange={(e) => handleUpdateDisposition(call, e.target.value)}
+                              onChange={(e) => handleSelectDispositionChange(call.id, e.target.value)}
                               className={`text-xs font-semibold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none ${
-                                call.disposition === 'Interested' || call.disposition === 'Converted' || call.disposition === 'Hot Lead'
+                                (selectedDispositions[call.id] || call.disposition) === 'Interested' || (selectedDispositions[call.id] || call.disposition) === 'Converted' || (selectedDispositions[call.id] || call.disposition) === 'Hot Lead'
                                   ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                                  : call.disposition === 'Follow-up Required' || call.disposition === 'Callback Requested'
+                                  : (selectedDispositions[call.id] || call.disposition) === 'Follow-up Required' || (selectedDispositions[call.id] || call.disposition) === 'Callback Requested'
                                   ? 'bg-indigo-50 text-indigo-700 border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800'
-                                  : call.disposition === 'Not Interested' || call.disposition === 'Do Not Contact'
+                                  : (selectedDispositions[call.id] || call.disposition) === 'Not Interested' || (selectedDispositions[call.id] || call.disposition) === 'Do Not Contact'
                                   ? 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
-                                  : call.disposition
+                                  : (selectedDispositions[call.id] || call.disposition)
                                   ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
                                   : 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
                               }`}
@@ -592,9 +591,32 @@ export default function ReportsPage() {
                               ))}
                               <option value="__ADD_NEW__">+ Add Custom Tag...</option>
                             </select>
-                            {updatingRowId === call.id && (
-                              <span className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                            )}
+
+                            {/* EXPLICIT SAVE BUTTON */}
+                            <button
+                              type="button"
+                              onClick={() => handleSaveDisposition(call)}
+                              disabled={updatingRowId === call.id || (!selectedDispositions[call.id] && !call.disposition)}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all shadow-sm ${
+                                savedRowIds[call.id]
+                                  ? 'bg-emerald-600 text-white'
+                                  : selectedDispositions[call.id] && selectedDispositions[call.id] !== call.disposition
+                                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white animate-pulse'
+                                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                              }`}
+                              title="Save this disposition to Google Sheet"
+                            >
+                              {updatingRowId === call.id ? (
+                                <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              ) : savedRowIds[call.id] ? (
+                                <>
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Saved</span>
+                                </>
+                              ) : (
+                                <span>Save</span>
+                              )}
+                            </button>
                           </div>
                         </td>
                       </tr>
