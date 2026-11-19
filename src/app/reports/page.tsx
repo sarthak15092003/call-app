@@ -24,6 +24,9 @@ import {
   Table,
   Plus,
   Tag,
+  RefreshCw,
+  Database,
+  UserCheck,
 } from 'lucide-react';
 
 const DEFAULT_DISPOSITIONS = [
@@ -50,6 +53,9 @@ export default function ReportsPage() {
   // Search & Filter for Consolidated Excel Ledger
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [matchedLeadOnly, setMatchedLeadOnly] = useState(false);
+  const [isSyncingDb, setIsSyncingDb] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'excel_ledger' | 'daily_summary'>('excel_ledger');
 
   // Custom Items / Dispositions state
@@ -93,7 +99,21 @@ export default function ReportsPage() {
       crmStore.updateCallAttempt(call.id, { disposition: newDisp });
       setCallAttempts(crmStore.getCallAttempts());
 
-      // 2. Sync to Google Sheet via API
+      // 2. Direct Sync to Google Apps Script via no-cors mode to ensure it goes through immediately
+      fetch('https://script.google.com/macros/s/AKfycbydty91hkWznt4kQiJA7_m2TKU5UbLEWpKLGrlSCAc7rIvAOcVYhzVI8BZwhr0pd3Rq/exec', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'UPDATE_DISPOSITION',
+          phone: call.customer_number,
+          row: call.sheet_row,
+          disposition: newDisp,
+          callId: call.id,
+        }),
+      }).catch(() => {});
+
+      // 3. Also Sync via internal server route
       await fetch('/api/telephony/update-disposition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -138,6 +158,29 @@ export default function ReportsPage() {
     setReports(list);
     if (list.length > 0) {
       setSelectedReport(list[0]);
+    }
+  };
+
+  const handleManualSyncDatabase = async () => {
+    setIsSyncingDb(true);
+    setSyncStatusMsg('Syncing latest calls & database...');
+    try {
+      const res = await fetch('/api/telephony/sheet-sync?refresh=' + Date.now());
+      if (res.ok) {
+        const data = await res.json();
+        if (data.calls && Array.isArray(data.calls)) {
+          crmStore.syncAllSheetCalls(data.calls);
+          const updated = crmStore.getCallAttempts();
+          setCallAttempts(updated);
+          setSyncStatusMsg(`Synced ${data.calls.length} calls successfully!`);
+          setTimeout(() => setSyncStatusMsg(null), 3000);
+        }
+      }
+    } catch (e: any) {
+      setSyncStatusMsg('Sync error: ' + (e.message || 'Network error'));
+      setTimeout(() => setSyncStatusMsg(null), 3000);
+    } finally {
+      setIsSyncingDb(false);
     }
   };
 
@@ -238,8 +281,22 @@ export default function ReportsPage() {
   };
 
   // Filtered Calls for Consolidated Excel Table
+  const allLeads = crmStore.getLeads();
+  const leadsPhoneSet = new Set(
+    allLeads.map((l) => (l.phone || '').replace(/\D/g, '').slice(-10)).filter((p) => p.length >= 7)
+  );
+
   const filteredAttempts = callAttempts.filter((a) => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+    
+    // Matched with Uploaded Database Filter
+    if (matchedLeadOnly) {
+      const cleanCustomerPhone = (a.customer_number || '').replace(/\D/g, '').slice(-10);
+      if (!leadsPhoneSet.has(cleanCustomerPhone)) {
+        return false;
+      }
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matchName = (a.customer_name || '').toLowerCase().includes(q);
@@ -317,8 +374,30 @@ export default function ReportsPage() {
             <Clock className="w-4 h-4 text-indigo-500" />
             <span>{isGenerating ? 'Compiling...' : 'Refresh Today'}</span>
           </button>
+
+          {/* BUTTON 1: SYNC DATABASE BUTTON */}
+          <button
+            type="button"
+            onClick={handleManualSyncDatabase}
+            disabled={isSyncingDb}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-bold text-blue-700 dark:text-blue-300 shadow-sm transition-colors"
+            title="Sync latest call records directly from Google Sheet database"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-blue-600 dark:text-blue-400 ${isSyncingDb ? 'animate-spin' : ''}`} />
+            <span>{isSyncingDb ? 'Syncing...' : 'Sync Database'}</span>
+          </button>
         </div>
       </div>
+
+      {/* Sync Status Banner */}
+      {syncStatusMsg && (
+        <div className="px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300 flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Database className="w-3.5 h-3.5 text-blue-500" />
+            {syncStatusMsg}
+          </span>
+        </div>
+      )}
 
       {/* VIEW 1: CONSOLIDATED EXCEL SPREADSHEET VIEW */}
       {activeView === 'excel_ledger' && (
@@ -386,6 +465,21 @@ export default function ReportsPage() {
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* BUTTON 2: SHOW LEADS MATCHED WITH UPLOADED DATABASE */}
+              <button
+                type="button"
+                onClick={() => setMatchedLeadOnly(!matchedLeadOnly)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${
+                  matchedLeadOnly
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                    : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title="Filter calls that match uploaded CRM database leads"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>{matchedLeadOnly ? 'Matched Uploaded Leads (ON)' : 'Match Uploaded Leads'}</span>
+              </button>
+
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}

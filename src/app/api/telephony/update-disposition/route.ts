@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch(APPS_SCRIPT_EXEC_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        redirect: 'follow',
         body: JSON.stringify({
           action: 'UPDATE_DISPOSITION',
           phone: phone || '',
