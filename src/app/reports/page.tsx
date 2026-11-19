@@ -74,6 +74,20 @@ export default function ReportsPage() {
   const [savedRowIds, setSavedRowIds] = useState<Record<string, boolean>>({});
   const [updatingRowId, setUpdatingRowId] = useState<string | null>(null);
 
+  const handleAddCustomOption = () => {
+    const custom = window.prompt('Enter new custom tag / disposition:');
+    if (custom && custom.trim().length > 0) {
+      const trimmed = custom.trim();
+      if (!dispositionOptions.includes(trimmed)) {
+        const updated = [...dispositionOptions, trimmed];
+        setDispositionOptions(updated);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('smartcall_disposition_options', JSON.stringify(updated));
+        }
+      }
+    }
+  };
+
   const handleSelectDispositionChange = (callId: string, val: string) => {
     if (val === '__ADD_NEW__') {
       handleAddCustomOption();
