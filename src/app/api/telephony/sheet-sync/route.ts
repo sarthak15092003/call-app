@@ -3,9 +3,9 @@ import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1mohRe5T9ADmM1YmW_b3OqInSL88YYeroW9aU0QkLLn8/gviz/tq?tqx=out:csv&sheet=Sheet1';
-const FALLBACK_CSV_URL = 'https://docs.google.com/spreadsheets/d/1mohRe5T9ADmM1YmW_b3OqInSL88YYeroW9aU0QkLLn8/gviz/tq?tqx=out:csv';
-const APPS_SCRIPT_EXEC_URL = 'https://script.google.com/macros/s/AKfycbydty91hkWznt4kQiJA7_m2TKU5UbLEWpKLGrlSCAc7rIvAOcVYhzVI8BZwhr0pd3Rq/exec';
+const PRIMARY_RAW_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1UDvJDDMgqYfjilMS4O43O6zvsoQwJsDDymXhVdF5AMw/gviz/tq?tqx=out:csv&sheet=Sheet1';
+const FINAL_LOG_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1mohRe5T9ADmM1YmW_b3OqInSL88YYeroW9aU0QkLLn8/gviz/tq?tqx=out:csv&sheet=Sheet1';
+const APPS_SCRIPT_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzid-mA-6PJSUWIrkJLWnsqqpm468CX6teWdRKKbXR6t_KBg7m4IzuFZq7knQJLzwIDdg/exec';
 
 function parseCsvLine(line: string): string[] {
   const row: string[] = [];
@@ -54,9 +54,9 @@ export async function GET(req: NextRequest) {
 
     let rows: any[] = [];
 
-    // 1. Try Google Sheet CSV export from Final Log sheet
+    // 1. Try Google Sheet CSV export from Primary Sheet (1UDv...)
     try {
-      const targetUrl = customUrl || GOOGLE_SHEET_CSV_URL;
+      const targetUrl = customUrl || PRIMARY_RAW_SHEET_CSV_URL;
       const csvRes = await fetch(targetUrl, {
         method: 'GET',
         redirect: 'follow',
@@ -81,13 +81,13 @@ export async function GET(req: NextRequest) {
         }
       }
     } catch (csvErr) {
-      console.warn('[CSV fetch failed, falling back to Apps Script]', csvErr);
+      console.warn('[CSV fetch failed from primary sheet]', csvErr);
     }
 
-    // 2. Fallback to default sheet CSV or Apps Script if rows is still empty
+    // 2. Fallback to Final Log Sheet if primary empty
     if (rows.length === 0) {
       try {
-        const fallbackRes = await fetch(FALLBACK_CSV_URL, { cache: 'no-store' });
+        const fallbackRes = await fetch(FINAL_LOG_SHEET_CSV_URL, { cache: 'no-store' });
         if (fallbackRes.ok) {
           const text = await fallbackRes.text();
           const lines = text.trim().split('\n').map((l) => l.replace(/\r/g, '')).filter(Boolean);

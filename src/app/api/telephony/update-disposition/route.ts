@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 const APPS_SCRIPT_EXEC_URL = 'https://script.google.com/macros/s/AKfycbydty91hkWznt4kQiJA7_m2TKU5UbLEWpKLGrlSCAc7rIvAOcVYhzVI8BZwhr0pd3Rq/exec';
+const RAW_APPS_SCRIPT_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzid-mA-6PJSUWIrkJLWnsqqpm468CX6teWdRKKbXR6t_KBg7m4IzuFZq7knQJLzwIDdg/exec';
 
 /**
  * POST /api/telephony/update-disposition
@@ -20,17 +21,27 @@ export async function POST(req: NextRequest) {
     // 1. Send update to Google Apps Script
     let sheetSuccess = false;
     try {
+      const updatePayload = JSON.stringify({
+        action: 'UPDATE_DISPOSITION',
+        phone: phone || '',
+        row: sheetRow,
+        disposition: disposition,
+        callId: callId || '',
+      });
+
+      // Update both Apps Script webhooks
+      fetch(RAW_APPS_SCRIPT_EXEC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        redirect: 'follow',
+        body: updatePayload,
+      }).catch(() => {});
+
       const res = await fetch(APPS_SCRIPT_EXEC_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         redirect: 'follow',
-        body: JSON.stringify({
-          action: 'UPDATE_DISPOSITION',
-          phone: phone || '',
-          row: sheetRow,
-          disposition: disposition,
-          callId: callId || '',
-        }),
+        body: updatePayload,
       });
       if (res.ok) {
         sheetSuccess = true;
