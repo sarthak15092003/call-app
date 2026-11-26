@@ -18,8 +18,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'disposition is required' }, { status: 400 });
     }
 
-    // 1. Send update to Google Apps Script
+    // 1. Send update to Google Apps Script in parallel with 4.5s timeout
     let sheetSuccess = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
     try {
       const updatePayload = JSON.stringify({
         action: 'UPDATE_DISPOSITION',
@@ -29,25 +31,28 @@ export async function POST(req: NextRequest) {
         callId: callId || '',
       });
 
-      // Update both Apps Script webhooks
-      fetch(RAW_APPS_SCRIPT_EXEC_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        redirect: 'follow',
-        body: updatePayload,
-      }).catch(() => {});
+      const results = await Promise.allSettled([
+        fetch(APPS_SCRIPT_EXEC_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          redirect: 'follow',
+          signal: controller.signal,
+          body: updatePayload,
+        }),
+        fetch(RAW_APPS_SCRIPT_EXEC_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          redirect: 'follow',
+          signal: controller.signal,
+          body: updatePayload,
+        }),
+      ]);
 
-      const res = await fetch(APPS_SCRIPT_EXEC_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        redirect: 'follow',
-        body: updatePayload,
-      });
-      if (res.ok) {
-        sheetSuccess = true;
-      }
+      sheetSuccess = results.some((r) => r.status === 'fulfilled' && r.value.ok);
     } catch (sheetErr) {
       console.warn('[Apps Script update-disposition failed]', sheetErr);
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     return NextResponse.json({

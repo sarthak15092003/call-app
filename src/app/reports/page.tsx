@@ -122,17 +122,24 @@ export default function ReportsPage() {
         }),
       }).catch(() => {});
 
-      // 2. Sync via internal route
-      await fetch('/api/telephony/update-disposition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: call.customer_number,
-          sheetRow: call.sheet_row,
-          disposition: chosenDisp,
-          callId: call.id,
-        }),
-      });
+      // 2. Sync via internal route with 4s timeout so UI never hangs
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      try {
+        await fetch('/api/telephony/update-disposition', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            phone: call.customer_number,
+            sheetRow: call.sheet_row,
+            disposition: chosenDisp,
+            callId: call.id,
+          }),
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       // Mark saved checkmark
       setSavedRowIds((prev) => ({ ...prev, [call.id]: true }));
@@ -146,8 +153,21 @@ export default function ReportsPage() {
     }
   };
 
+  const refreshFromStore = () => {
+    const attempts = crmStore.getCallAttempts();
+    setCallAttempts(attempts);
+    const list = crmStore.getReports();
+    setReports(list);
+    if (list.length > 0 && !selectedReport) {
+      setSelectedReport(list[0]);
+    }
+  };
+
   const loadData = async () => {
-    // 1. Fetch latest sheet calls directly so UI never shows empty if localStorage was cleared
+    // 1. Show cached store data immediately (0ms)
+    refreshFromStore();
+
+    // 2. Fetch latest sheet calls once on mount
     try {
       const res = await fetch('/api/telephony/sheet-sync');
       if (res.ok) {
@@ -163,7 +183,6 @@ export default function ReportsPage() {
     const attempts = crmStore.getCallAttempts();
     setCallAttempts(attempts);
 
-    // Always regenerate/refresh today's report based on the real deduplicated call attempts
     if (attempts.length > 0) {
       const today = new Date().toISOString().split('T')[0];
       crmStore.generateDailyReport(today);
@@ -201,8 +220,8 @@ export default function ReportsPage() {
 
   useEffect(() => {
     loadData();
-    window.addEventListener('smartcall_store_update', loadData);
-    return () => window.removeEventListener('smartcall_store_update', loadData);
+    window.addEventListener('smartcall_store_update', refreshFromStore);
+    return () => window.removeEventListener('smartcall_store_update', refreshFromStore);
   }, []);
 
   const handleGenerateToday = () => {
@@ -313,7 +332,7 @@ export default function ReportsPage() {
     if (cleanPhone.length >= 7) {
       leadsPhoneSet.add(cleanPhone);
       const rawSource = (l.event_name || l.lead_source || '').trim();
-      const isGeneric = ['import', 'google sheet sync', 'mobile carrier call', ''].includes(rawSource.toLowerCase());
+      const isGeneric = ['import', 'google sheet sync', 'mobile carrier call', 'carrier call', ''].includes(rawSource.toLowerCase());
       const resolvedEvent = !isGeneric
         ? rawSource
         : (batchEventMap.get(l.batch_id) || 'Uploaded Leads');
