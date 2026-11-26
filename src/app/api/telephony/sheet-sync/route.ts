@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 const PRIMARY_RAW_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1UDvJDDMgqYfjilMS4O43O6zvsoQwJsDDymXhVdF5AMw/gviz/tq?tqx=out:csv&sheet=Sheet1';
 const FINAL_LOG_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1mohRe5T9ADmM1YmW_b3OqInSL88YYeroW9aU0QkLLn8/gviz/tq?tqx=out:csv&sheet=Sheet1';
-const APPS_SCRIPT_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzid-mA-6PJSUWIrkJLWnsqqpm468CX6teWdRKKbXR6t_KBg7m4IzuFZq7knQJLzwIDdg/exec';
+const APPS_SCRIPT_EXEC_URL = 'https://script.google.com/macros/s/AKfycbwkV3ZgXda-H1q0tNDKH6iUKmErjnlps1jHIDsEfpDIyNW6CjfjGBH7hTpjigC3wG3oMg/exec';
 
 function parseCsvLine(line: string): string[] {
   const row: string[] = [];

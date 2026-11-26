@@ -108,18 +108,25 @@ export default function ReportsPage() {
       crmStore.updateCallAttempt(call.id, { disposition: chosenDisp });
       setCallAttempts(crmStore.getCallAttempts());
 
-      // 1. Direct Sync to Google Apps Script
+      // 1. Direct Sync to Google Apps Script (Call Log & Final Log sheets)
+      const dispBody = JSON.stringify({
+        action: 'UPDATE_DISPOSITION',
+        phone: call.customer_number,
+        row: call.sheet_row,
+        disposition: chosenDisp,
+        callId: call.id,
+      });
+      fetch('https://script.google.com/macros/s/AKfycbwkV3ZgXda-H1q0tNDKH6iUKmErjnlps1jHIDsEfpDIyNW6CjfjGBH7hTpjigC3wG3oMg/exec', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: dispBody,
+      }).catch(() => {});
       fetch('https://script.google.com/macros/s/AKfycbydty91hkWznt4kQiJA7_m2TKU5UbLEWpKLGrlSCAc7rIvAOcVYhzVI8BZwhr0pd3Rq/exec', {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'UPDATE_DISPOSITION',
-          phone: call.customer_number,
-          row: call.sheet_row,
-          disposition: chosenDisp,
-          callId: call.id,
-        }),
+        body: dispBody,
       }).catch(() => {});
 
       // 2. Sync via internal route with 4s timeout so UI never hangs
