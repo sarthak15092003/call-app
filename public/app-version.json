@@ -1,0 +1,7 @@
+{
+  "versionCode": 2,
+  "versionName": "1.1",
+  "apkUrl": "https://call-app-aouj.vercel.app/smartcall-agent.apk",
+  "webhookUrl": "https://script.google.com/macros/s/AKfycbwkV3ZgXda-H1q0tNDKH6iUKmErjnlps1jHIDsEfpDIyNW6CjfjGBH7hTpjigC3wG3oMg/exec",
+  "releaseNotes": "In-app Play Store-style auto-update & wireless remote webhook sync."
+}
