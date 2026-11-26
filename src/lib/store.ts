@@ -741,6 +741,20 @@ class CRMStore {
   syncAllSheetCalls(sheetCalls: any[]): void {
     if (!Array.isArray(sheetCalls) || sheetCalls.length === 0) return;
 
+    // Preserve any locally saved dispositions so reloading never wipes them out
+    const existingAttempts = this.getCallAttempts();
+    const existingDispById = new Map<string, string>();
+    const existingDispByRowPhone = new Map<string, string>();
+    existingAttempts.forEach((a) => {
+      if (a.disposition) {
+        if (a.id) existingDispById.set(a.id, a.disposition);
+        const cleanPhone = (a.customer_number || '').replace(/\D/g, '').slice(-10);
+        if (a.sheet_row && cleanPhone) {
+          existingDispByRowPhone.set(`${a.sheet_row}_${cleanPhone}`, a.disposition);
+        }
+      }
+    });
+
     // 1. Convert sheet calls to CallAttempt objects
     const newAttempts: CallAttempt[] = sheetCalls.map((sc, idx) => {
       const isConnected = sc.duration > 0;
@@ -753,10 +767,18 @@ class CRMStore {
 
       const parsedDate = new Date(sc.timestamp);
       const isoTime = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : sc.timestamp;
+      const attemptId = sc.id || `call_sheet_${Date.parse(sc.timestamp) || Date.now()}_${idx}`;
+      const sheetRow = sc.sheetRow || (idx + 2);
+      const cleanPhone = String(sc.customerNumber || '').replace(/\D/g, '').slice(-10);
+      const preservedDisp =
+        sc.disposition ||
+        existingDispById.get(attemptId) ||
+        existingDispByRowPhone.get(`${sheetRow}_${cleanPhone}`) ||
+        undefined;
 
       return {
-        id: sc.id || `call_sheet_${Date.parse(sc.timestamp) || Date.now()}_${idx}`,
-        lead_id: `lead_${(sc.customerNumber || '').replace(/\D/g, '').slice(-10)}`,
+        id: attemptId,
+        lead_id: `lead_${cleanPhone}`,
         customer_name: sc.customerName || 'Customer',
         customer_number: sc.customerNumber,
         agent_id: agentId,
@@ -769,8 +791,8 @@ class CRMStore {
         end_time: isoTime,
         ringing_duration: 0,
         connected_duration: sc.duration || 0,
-        disposition: sc.disposition || undefined,
-        sheet_row: sc.sheetRow || (idx + 2),
+        disposition: preservedDisp,
+        sheet_row: sheetRow,
         is_demo: false,
         created_at: isoTime,
       };

@@ -121,6 +121,33 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Also fetch Final Log sheet dispositions in parallel so tags persist across browsers
+    const finalLogDispByRowPhone = new Map<string, string>();
+    try {
+      const finalRes = await fetch(FINAL_LOG_SHEET_CSV_URL, { cache: 'no-store' });
+      if (finalRes.ok) {
+        const text = await finalRes.text();
+        const lines = text.trim().split('\n').map((l) => l.replace(/\r/g, '')).filter(Boolean);
+        if (lines.length > 1) {
+          const headers = parseCsvLine(lines[0]);
+          for (let i = 1; i < lines.length; i++) {
+            const cols = parseCsvLine(lines[i]);
+            const rowObj: Record<string, any> = {};
+            for (let j = 0; j < headers.length; j++) {
+              rowObj[headers[j]] = cols[j] || '';
+            }
+            const disp = String(rowObj['Disposition'] || rowObj['disposition'] || '').trim();
+            const ph = String(rowObj['Phone Number'] || '').replace(/\D/g, '').slice(-10);
+            if (disp && ph) {
+              finalLogDispByRowPhone.set(`${i + 1}_${ph}`, disp);
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore fallback error
+    }
+
     const syncedCalls: any[] = [];
 
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
@@ -170,6 +197,7 @@ export async function GET(req: NextRequest) {
         row['Status'] ||
         row['Tags'] ||
         row['Tag'] ||
+        finalLogDispByRowPhone.get(`${rowIndex + 2}_${cleanPhone.slice(-10)}`) ||
         ''
       ).trim();
 
