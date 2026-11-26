@@ -53,6 +53,8 @@ export default function ReportsPage() {
   // Search & Filter for Consolidated Excel Ledger
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [eventFilter, setEventFilter] = useState<string>('all');
+  const [agentFilter, setAgentFilter] = useState<string>('all');
   const [matchedLeadOnly, setMatchedLeadOnly] = useState(false);
   const [isSyncingDb, setIsSyncingDb] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
@@ -239,15 +241,17 @@ export default function ReportsPage() {
 
   const handleDownloadConsolidatedCSV = () => {
     if (callAttempts.length === 0) return;
-    const headers = ['Row #', 'Date & Time', 'Customer Name', 'Phone Number', 'Duration (s)', 'Status', 'Agent Name', 'Call ID'];
+    const headers = ['Row #', 'Date & Time', 'Customer Name', 'Phone Number', 'Event', 'Duration (s)', 'Status', 'Agent Name', 'Disposition', 'Call ID'];
     const rows = filteredAttempts.map((a, idx) => [
       idx + 1,
       `"${new Date(a.start_time).toLocaleString()}"`,
       `"${(a.customer_name || 'Customer').replace(/"/g, '""')}"`,
       `"${a.customer_number}"`,
+      `"${getCallEventName(a).replace(/"/g, '""')}"`,
       a.connected_duration || 0,
       `"${a.status}"`,
       `"${a.agent_name || "sarthak's F16"}"`,
+      `"${(selectedDispositions[a.id] || a.disposition || '').replace(/"/g, '""')}"`,
       `"${a.id}"`,
     ]);
 
@@ -293,15 +297,54 @@ export default function ReportsPage() {
     }
   };
 
-  // Filtered Calls for Consolidated Excel Table
+  // Filtered Calls for Consolidated Excel Table & Event/Agent Resolution
   const allLeads = crmStore.getLeads();
-  const leadsPhoneSet = new Set(
-    allLeads.map((l) => (l.phone || '').replace(/\D/g, '').slice(-10)).filter((p) => p.length >= 7)
-  );
+  const allBatches = crmStore.getBatches();
+  const batchEventMap = new Map<string, string>();
+  allBatches.forEach((b) => {
+    const label = (b.event_name || b.file_name || '').replace(/\.(xlsx|xls|csv)$/i, '').trim();
+    if (label) batchEventMap.set(b.id, label);
+  });
+
+  const phoneToEventMap = new Map<string, string>();
+  const leadsPhoneSet = new Set<string>();
+  allLeads.forEach((l) => {
+    const cleanPhone = (l.phone || '').replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length >= 7) {
+      leadsPhoneSet.add(cleanPhone);
+      const rawSource = (l.event_name || l.lead_source || '').trim();
+      const isGeneric = ['import', 'google sheet sync', 'mobile carrier call', ''].includes(rawSource.toLowerCase());
+      const resolvedEvent = !isGeneric
+        ? rawSource
+        : (batchEventMap.get(l.batch_id) || 'Uploaded Leads');
+      if (!phoneToEventMap.has(cleanPhone) || !isGeneric) {
+        phoneToEventMap.set(cleanPhone, resolvedEvent);
+      }
+    }
+  });
+
+  const getCallEventName = (call: CallAttempt): string => {
+    const cleanPhone = (call.customer_number || '').replace(/\D/g, '').slice(-10);
+    return phoneToEventMap.get(cleanPhone) || 'Unassigned / Direct Call';
+  };
+
+  const uniqueEvents = Array.from(
+    new Set(callAttempts.map((a) => getCallEventName(a)))
+  ).sort((a, b) => {
+    if (a === 'Unassigned / Direct Call') return 1;
+    if (b === 'Unassigned / Direct Call') return -1;
+    return a.localeCompare(b);
+  });
+
+  const uniqueAgents = Array.from(
+    new Set(callAttempts.map((a) => (a.agent_name || "sarthak's F16").trim()))
+  ).sort((a, b) => a.localeCompare(b));
 
   const filteredAttempts = callAttempts.filter((a) => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
-    
+    if (eventFilter !== 'all' && getCallEventName(a) !== eventFilter) return false;
+    if (agentFilter !== 'all' && (a.agent_name || "sarthak's F16").trim() !== agentFilter) return false;
+
     // Matched with Uploaded Database Filter
     if (matchedLeadOnly) {
       const cleanCustomerPhone = (a.customer_number || '').replace(/\D/g, '').slice(-10);
@@ -315,7 +358,8 @@ export default function ReportsPage() {
       const matchName = (a.customer_name || '').toLowerCase().includes(q);
       const matchPhone = (a.customer_number || '').includes(q);
       const matchAgent = (a.agent_name || '').toLowerCase().includes(q);
-      if (!matchName && !matchPhone && !matchAgent) return false;
+      const matchEvent = getCallEventName(a).toLowerCase().includes(q);
+      if (!matchName && !matchPhone && !matchAgent && !matchEvent) return false;
     }
     return true;
   });
@@ -477,7 +521,7 @@ export default function ReportsPage() {
               />
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               {/* BUTTON 2: SHOW LEADS MATCHED WITH UPLOADED DATABASE */}
               <button
                 type="button"
@@ -492,6 +536,36 @@ export default function ReportsPage() {
                 <UserCheck className="w-3.5 h-3.5" />
                 <span>{matchedLeadOnly ? 'Matched Uploaded Leads (ON)' : 'Match Uploaded Leads'}</span>
               </button>
+
+              {/* EVENT-WISE FILTER */}
+              <select
+                value={eventFilter}
+                onChange={(e) => setEventFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500"
+                title="Filter calls by Event / Campaign"
+              >
+                <option value="all">All Events ({uniqueEvents.length})</option>
+                {uniqueEvents.map((ev) => (
+                  <option key={ev} value={ev}>
+                    {ev}
+                  </option>
+                ))}
+              </select>
+
+              {/* AGENT-WISE FILTER */}
+              <select
+                value={agentFilter}
+                onChange={(e) => setAgentFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500"
+                title="Filter calls by Agent"
+              >
+                <option value="all">All Agents ({uniqueAgents.length})</option>
+                {uniqueAgents.map((ag) => (
+                  <option key={ag} value={ag}>
+                    {ag}
+                  </option>
+                ))}
+              </select>
 
               <select
                 value={statusFilter}
@@ -516,6 +590,7 @@ export default function ReportsPage() {
                   <th className="px-4 py-3">Timestamp (IST)</th>
                   <th className="px-4 py-3">Customer Name</th>
                   <th className="px-4 py-3">Phone Number</th>
+                  <th className="px-4 py-3">Event</th>
                   <th className="px-4 py-3">Duration</th>
                   <th className="px-4 py-3">Call Status</th>
                   <th className="px-4 py-3">Agent</th>
@@ -525,13 +600,14 @@ export default function ReportsPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-sans">
                 {filteredAttempts.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400 font-sans">
+                    <td colSpan={9} className="px-4 py-12 text-center text-slate-400 font-sans">
                       No calls matching current filters. Real calls will appear here automatically as synced from Google Sheet.
                     </td>
                   </tr>
                 ) : (
                   filteredAttempts.map((call, idx) => {
                     const isConnected = call.status === 'connected';
+                    const callEvent = getCallEventName(call);
                     return (
                       <tr
                         key={call.id || idx}
@@ -558,6 +634,17 @@ export default function ReportsPage() {
                         </td>
                         <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 font-semibold">
                           {call.customer_number}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                              callEvent === 'Unassigned / Direct Call'
+                                ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                                : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
+                            }`}
+                          >
+                            {callEvent}
+                          </span>
                         </td>
                         <td className="px-4 py-3 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                           {formatDurationStr(call.connected_duration || 0)}
@@ -650,6 +737,7 @@ export default function ReportsPage() {
                     <td className="px-4 py-3 text-indigo-600 font-sans">
                       {new Set(filteredAttempts.map((a) => a.customer_number)).size} Unique Contacts
                     </td>
+                    <td className="px-4 py-3 text-slate-400 text-xs">--</td>
                     <td className="px-4 py-3 text-slate-400 text-xs">--</td>
                     <td className="px-4 py-3 text-emerald-600 dark:text-emerald-400 font-mono text-sm">
                       {formatDurationStr(totalFilteredDuration)}

@@ -31,6 +31,7 @@ export default function AllLeadsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInterest, setSelectedInterest] = useState<string>('all');
   const [selectedCallStatus, setSelectedCallStatus] = useState<string>('all');
+  const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [selectedLeadModalId, setSelectedLeadModalId] = useState<string | null>(null);
 
@@ -46,6 +47,10 @@ export default function AllLeadsPage() {
     return () => window.removeEventListener('smartcall_store_update', loadData);
   }, []);
 
+  const uniqueLeadEvents = Array.from(
+    new Set(leads.map((l) => (l.event_name || l.lead_source || 'Unassigned').trim()))
+  ).sort();
+
   const filteredLeads = leads.filter((lead) => {
     // RBAC: If agent, can access assigned leads (or unassigned)
     if (currentUser.role === 'agent' && lead.assigned_agent_id !== currentUser.id && lead.assigned_agent_id) {
@@ -56,6 +61,7 @@ export default function AllLeadsPage() {
 
     if (selectedInterest !== 'all' && lead.interest_status !== selectedInterest) return false;
     if (selectedCallStatus !== 'all' && lead.last_call_status !== selectedCallStatus) return false;
+    if (selectedEvent !== 'all' && (lead.event_name || lead.lead_source || 'Unassigned').trim() !== selectedEvent) return false;
     if (selectedAgent !== 'all' && lead.assigned_agent_id !== selectedAgent) return false;
 
     if (searchTerm) {
@@ -156,6 +162,20 @@ export default function AllLeadsPage() {
             <option value="busy">Busy</option>
             <option value="no_answer">No Answer</option>
             <option value="never_called">Never Called</option>
+          </select>
+
+          {/* Event Filter */}
+          <select
+            value={selectedEvent}
+            onChange={(e) => setSelectedEvent(e.target.value)}
+            className="px-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none"
+          >
+            <option value="all">All Events ({uniqueLeadEvents.length})</option>
+            {uniqueLeadEvents.map((ev) => (
+              <option key={ev} value={ev}>
+                {ev}
+              </option>
+            ))}
           </select>
 
           {/* Agent Filter (Admin only) */}

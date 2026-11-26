@@ -44,6 +44,7 @@ export default function UploadLeadsPage() {
 
   // Upload workflow state
   const [file, setFile] = useState<File | null>(null);
+  const [eventName, setEventName] = useState('');
   const [fileBuffer, setFileBuffer] = useState<ArrayBuffer | null>(null);
   const [fileType, setFileType] = useState<'xlsx' | 'xls' | 'csv'>('xlsx');
   const [headers, setHeaders] = useState<string[]>([]);
@@ -89,6 +90,7 @@ export default function UploadLeadsPage() {
     }
 
     setFile(selectedFile);
+    setEventName(selectedFile.name.replace(/\.(xlsx|xls|csv)$/i, '').replace(/[_-]+/g, ' '));
     setFileType(ext as any);
     setIsProcessing(true);
 
@@ -197,6 +199,7 @@ export default function UploadLeadsPage() {
 
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const batchId = `BATCH-${dateStr}-${Math.floor(Math.random() * 89 + 10)}`;
+    const resolvedBatchEvent = eventName.trim() || file.name.replace(/\.(xlsx|xls|csv)$/i, '');
 
     const agentUsers = users.filter((u) => u.role === 'agent');
 
@@ -210,6 +213,12 @@ export default function UploadLeadsPage() {
         agent = agentUsers[idx % agentUsers.length];
       }
 
+      const rowSource = (r.data.lead_source || '').trim();
+      const effectiveEvent =
+        rowSource && rowSource.toLowerCase() !== 'import'
+          ? rowSource
+          : resolvedBatchEvent;
+
       return {
         id: `lead_${Date.now()}_${idx}`,
         batch_id: batchId,
@@ -219,7 +228,8 @@ export default function UploadLeadsPage() {
         company: r.data.company,
         email: r.data.email,
         location: r.data.location,
-        lead_source: r.data.lead_source,
+        lead_source: effectiveEvent,
+        event_name: effectiveEvent,
         assigned_agent_id: agent ? agent.id : '',
         assigned_agent_name: agent ? agent.name : 'Unassigned',
         remarks: r.data.remarks,
@@ -246,6 +256,7 @@ export default function UploadLeadsPage() {
     const newBatch: LeadImportBatch = {
       id: batchId,
       file_name: file.name,
+      event_name: resolvedBatchEvent,
       file_size: file.size,
       uploaded_by: currentUser.id,
       uploaded_by_name: currentUser.name,
@@ -572,6 +583,25 @@ export default function UploadLeadsPage() {
               >
                 Choose another file
               </button>
+            </div>
+
+            {/* Event / Campaign Name Input */}
+            <div className="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/60 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                  Event / Campaign Name (for Event-wise Call Filtering)
+                </label>
+                <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
+                  Calls to any phone number in this file will automatically be tagged with this Event on the Reports page (unless an Event/Lead Source column is mapped below).
+                </p>
+              </div>
+              <input
+                type="text"
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                placeholder="e.g. Diwali Expo 2026"
+                className="w-full sm:w-72 px-3 py-2 rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

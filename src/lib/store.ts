@@ -206,6 +206,7 @@ class CRMStore {
             email: lead.email || existing.email,
             location: lead.location || existing.location,
             lead_source: lead.lead_source || existing.lead_source,
+            event_name: lead.event_name || existing.event_name,
             assigned_agent_id: lead.assigned_agent_id || existing.assigned_agent_id,
             assigned_agent_name: lead.assigned_agent_name || existing.assigned_agent_name,
             remarks: lead.remarks ? `${existing.remarks} | ${lead.remarks}` : existing.remarks,

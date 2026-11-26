@@ -61,7 +61,7 @@ export function autoDetectColumnMapping(headers: string[]): ColumnMapping {
     company: findMatch(['company', 'org', 'organization', 'business']),
     email: findMatch(['email', 'mail']),
     location: findMatch(['location', 'city', 'address', 'state']),
-    leadSource: findMatch(['source', 'channel', 'campaign', 'origin']),
+    leadSource: findMatch(['event', 'eventname', 'source', 'channel', 'campaign', 'origin']),
     assignedAgent: findMatch(['agent', 'assigned', 'rep', 'owner']),
     remarks: findMatch(['remark', 'note', 'comment', 'description']),
   };

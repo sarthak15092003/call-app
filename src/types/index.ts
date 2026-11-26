@@ -35,6 +35,7 @@ export type CallStatus =
 export interface LeadImportBatch {
   id: string;
   file_name: string;
+  event_name?: string;
   file_size: number;
   uploaded_by: string;
   uploaded_by_name: string;
@@ -63,6 +64,7 @@ export interface Lead {
   email: string;
   location: string;
   lead_source: string;
+  event_name?: string;
   assigned_agent_id: string;
   assigned_agent_name: string;
   remarks: string;
